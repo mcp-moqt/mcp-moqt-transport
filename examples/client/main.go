@@ -1,41 +1,40 @@
-// Example client implementation for MCP over MOQT.
 package main
 
 import (
 	"context"
 	"flag"
 	"log"
-	"time"
 
-	mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport"
+	mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8080", "server address")
-	timeout := flag.Duration("timeout", 5*time.Second, "connect timeout")
 	flag.Parse()
+
+	ctx := context.Background()
 
 	transport, err := mcpmoqt.NewMoqTransport(
 		mcpmoqt.RoleClient,
 		mcpmoqt.WithAddr(*addr),
 	)
 	if err != nil {
-		log.Fatalf("transport: %v", err)
+		log.Fatalf("new client transport: %v", err)
 	}
 
-	client := mcp.NewClient(&mcp.Implementation{Name: "moqt-mcp-client", Version: "v0.1.2"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{
+		Name:    "example-client",
+		Version: "v0.2.0",
+	}, nil)
 
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-	defer cancel()
-
-	cs, err := client.Connect(ctx, transport, nil)
+	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
 		log.Fatalf("client connect: %v", err)
 	}
-	defer cs.Close()
+	defer session.Close()
 
-	if err := cs.Ping(ctx, nil); err != nil {
+	if err := session.Ping(ctx, nil); err != nil {
 		log.Fatalf("ping: %v", err)
 	}
 
