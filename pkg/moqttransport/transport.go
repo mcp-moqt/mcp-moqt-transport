@@ -2,15 +2,10 @@ package mcpmoqt
 
 import (
 	"context"
-	"errors"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mengelbart/moqtransport"
 )
-
-// ErrConnectionClosed is returned when sending a message to a connection that
-// is closed or in the process of closing.
-var ErrConnectionClosed = mcp.ErrConnectionClosed
 
 // Transport re-exports the MCP SDK Transport interface.
 type Transport = mcp.Transport
@@ -36,10 +31,10 @@ type MOQTTransport struct {
 // Connect implements the Transport interface.
 func (t *MOQTTransport) Connect(ctx context.Context) (Connection, error) {
 	if t.Session == nil {
-		return nil, errors.New("MOQT session not initialized")
+		return nil, NewTransportError("Connect", ErrSessionNotFound)
 	}
 
 	// This is a placeholder implementation
 	// The actual implementation is in server.go and client.go
-	return nil, errors.New("not implemented")
+	return nil, NewTransportError("Connect", ErrSessionNotFound)
 }

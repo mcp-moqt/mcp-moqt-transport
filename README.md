@@ -4,7 +4,7 @@
 
 ## 开发说明
 
-v0.2.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
+v0.3.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
 
 ## 概述
 
@@ -27,10 +27,36 @@ v0.2.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 - 日志记录功能，支持不同日志级别。
 - 配置文件支持（YAML/JSON 格式）。
 - 环境变量支持，便于在不同环境中部署。
+- 完善的错误类型和错误处理机制。
+- 性能基准测试支持。
+- CI/CD 自动化集成。
+- 示例配置文件和环境变量模板。
 
 ## 版本
 
-当前版本：v0.2.0
+当前版本：v0.3.0
+
+## v0.3.0 更新概述
+
+- 统一入口：`NewMoqTransport(RoleServer/RoleClient)`，上层保持 `Run/Connect` 的简洁调用方式。
+- TLS 默认行为：server 端本地自签名证书；client 端默认 `InsecureSkipVerify`，均可通过 Option 覆盖。
+- ALPN 默认 `moq-00`（基于 moqtransport draft-11）。
+- discovery 仍使用 `mcp/discovery/sessions`（FETCH）。
+- examples 已更新到统一入口；新增/补充草案注释标记。
+- 合并重复代码：将 `internal/transport/` 目录中的代码合并到 `pkg/moqttransport/` 目录。
+- 创建 `docs/` 目录，提供详细的 API 文档和设计文档。
+- 统一测试目录：将测试文件统一放在 `test/` 目录。
+- 增强错误处理：添加更全面的错误处理机制。
+- 添加注释：为关键代码添加详细的注释。
+- 优化依赖管理：更新依赖版本，确保安全性和稳定性。
+- 增加测试覆盖率：添加更多的单元测试和集成测试。
+- 添加日志记录功能，支持不同日志级别。
+- 添加配置文件支持（YAML/JSON 格式）。
+- 添加环境变量支持，便于在不同环境中部署。
+- 添加完善的错误类型和错误处理机制。
+- 添加性能基准测试支持。
+- 添加 CI/CD 自动化集成。
+- 添加示例配置文件和环境变量模板。
 
 ## v0.2.0 更新概述
 
@@ -49,12 +75,15 @@ v0.2.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 - 添加日志记录功能，支持不同日志级别。
 - 添加配置文件支持（YAML/JSON 格式）。
 - 添加环境变量支持，便于在不同环境中部署。
+- 添加完善的错误类型和错误处理机制。
+- 添加性能基准测试支持。
+- 添加 CI/CD 自动化集成。
+- 添加示例配置文件和环境变量模板。
 
 ## Roadmap / TODO
 
 - 预留 `resources/tools/notifications` 轨道（Draft: draft-jennings-mcp-over-moqt-00 §2.3/§2.4）。
-- v0.2.0 仅保留轨道命名与 TODO 注释，不实现具体业务语义；后续将补充订阅/发布与消息结构。
-- 添加配置文件和环境变量支持，提高灵活性。
+- v0.3.0 仅保留轨道命名与 TODO 注释，不实现具体业务语义；后续将补充订阅/发布与消息结构。
 
 ## 快速上手
 
@@ -117,7 +146,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.2.0",
+        Version: "v0.3.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
@@ -152,7 +181,7 @@ func main() {
 
     client := mcp.NewClient(&mcp.Implementation{
         Name:    "example-client",
-        Version: "v0.2.0",
+        Version: "v0.3.0",
     }, nil)
 
     session, err := client.Connect(ctx, transport, nil)
@@ -163,6 +192,50 @@ func main() {
 
     if err := session.Ping(ctx, nil); err != nil {
         log.Fatalf("ping: %v", err)
+    }
+}
+```
+
+### 使用配置文件
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+
+    mcpconfig "github.com/mcp-moqt/mcp-moqt-transport/pkg/config"
+    mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
+    "github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // 从 YAML 文件加载配置
+    config, err := mcpconfig.LoadFromFile("config.yaml")
+    if err != nil {
+        log.Fatalf("failed to load config: %v", err)
+    }
+
+    // 使用配置创建 transport
+    transport, err := mcpmoqt.NewMoqTransport(
+        mcpmoqt.RoleServer,
+        mcpmoqt.WithAddr(config.Server.Addr),
+        mcpmoqt.WithALPN(config.Server.ALPN...),
+    )
+    if err != nil {
+        log.Fatalf("new transport: %v", err)
+    }
+
+    server := mcp.NewServer(&mcp.Implementation{
+        Name:    "example-server",
+        Version: "v0.3.0",
+    }, nil)
+
+    if err := server.Run(ctx, transport); err != nil {
+        log.Fatalf("server run: %v", err)
     }
 }
 ```
@@ -193,41 +266,94 @@ go test -v ./test/unit/...
 go test -v ./test/integration/...
 ```
 
+### 运行性能基准测试
+
+```bash
+cd test/benchmark
+go test -bench=Benchmark -benchmem
+```
+
+### 运行代码质量检查
+
+```bash
+go vet ./...
+golangci-lint run ./...
+```
+
+## 配置
+
+### 配置文件
+
+项目支持 YAML 和 JSON 格式的配置文件。示例配置文件：
+
+- `config.example.yaml` - YAML 格式示例配置
+- `config.example.json` - JSON 格式示例配置
+
+### 环境变量
+
+项目支持通过环境变量配置。示例环境变量：
+
+- `.env.example` - 环境变量示例
+
+### 配置优先级
+
+1. 命令行参数（最高优先级）
+2. 环境变量
+3. 配置文件
+4. 默认值（最低优先级）
+
 ## 项目结构
 
 ```
 mcp-moqt-transport/
-pkg/
-  config/                # 配置管理（支持 YAML/JSON/环境变量）
-  logger/                # 日志记录
-  moqttransport/         # 核心实现
-    client.go            # 客户端连接/会话封装
-    control_conn.go      # 控制轨道的 JSON-RPC 读写
-    new_transport.go     # 统一构造函数
-    options.go           # 可配置选项（addr/TLS/ALPN/QUIC）
-    quic_moq.go          # QUIC <-> moqtransport 适配
-    server.go            # 服务端连接/会话封装
-    session_handlers.go  # discovery / subscribe handler
-    session_id.go        # MCP Session ID 生成
-    tls.go               # TLS 默认行为与封装
-    transport.go         # MCP over MOQT 的 Transport/Connection 实现
-
-test/
-  integration/           # 集成测试
-    connectivity_test.go # 端到端 Run + Ping 测试
-  unit/                  # 单元测试
-    config/              # 配置管理测试
-    configfile/          # 配置文件测试
-    logger/              # 日志记录测试
-    mcpmoqt/             # 核心功能测试
-    options_test.go      # 配置选项测试
-
-docs/
-  api.md                # API 文档
-  design.md             # 设计文档
-
-examples/               # 示例：server/client
-README.md               # 项目说明
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # GitHub Actions CI 配置
+├── pkg/
+│   ├── config/                # 配置管理（支持 YAML/JSON/环境变量）
+│   ├── logger/                # 日志记录
+│   └── moqttransport/         # 核心实现
+│       ├── client.go            # 客户端连接/会话封装
+│       ├── control_conn.go      # 控制轨道的 JSON-RPC 读写
+│       ├── errors.go            # 错误类型定义
+│       ├── new_transport.go     # 统一构造函数
+│       ├── options.go           # 可配置选项（addr/TLS/ALPN/QUIC）
+│       ├── quic_moq.go          # QUIC <-> moqtransport 适配
+│       ├── server.go            # 服务端连接/会话封装
+│       ├── session_handlers.go  # discovery / subscribe handler
+│       ├── session_id.go        # MCP Session ID 生成
+│       ├── tls.go               # TLS 默认行为与封装
+│       └── transport.go         # MCP over MOQT 的 Transport/Connection 实现
+├── test/
+│   ├── benchmark/             # 性能基准测试
+│   │   └── benchmark_test.go
+│   ├── integration/           # 集成测试
+│   │   └── connectivity_test.go # 端到端 Run + Ping 测试
+│   └── unit/                  # 单元测试
+│       ├── config/              # 配置管理测试
+│       ├── configfile/          # 配置文件测试
+│       ├── logger/              # 日志记录测试
+│       └── mcpmoqt/             # 核心功能测试
+│           ├── errors_test.go
+│           ├── moqttransport_test.go
+│           └── options_test.go
+├── docs/
+│   ├── api.md                # API 文档
+│   └── design.md             # 设计文档
+├── examples/                  # 示例：server/client
+│   ├── client/
+│   └── server/
+├── config.example.yaml       # YAML 配置示例
+├── config.example.json       # JSON 配置示例
+├── .env.example              # 环境变量示例
+├── Dockerfile.client         # 客户端 Dockerfile
+├── Dockerfile.server         # 服务端 Dockerfile
+├── docker-compose.yml        # Docker Compose 配置
+├── .gitignore                # Git 忽略文件
+├── LICENSE                   # 许可证
+├── go.mod                    # Go 模块依赖
+├── go.sum                    # Go 依赖校验和
+└── README.md                 # 项目说明
 ```
 
 ## 文档
@@ -249,12 +375,15 @@ README.md               # 项目说明
 - [x] 优化依赖管理，更新依赖版本
 - [x] 添加日志记录功能
 - [x] 添加配置文件和环境变量支持
+- [x] 添加完善的错误类型和错误处理机制
+- [x] 添加性能基准测试支持
+- [x] 添加 CI/CD 自动化集成
 - [ ] resources/tools/notifications 轨道与语义
-
-## 许可
-
-MIT License
 
 ## 贡献
 
 欢迎提交 Issue 或 Pull Request。
+
+## 许可
+
+MIT License

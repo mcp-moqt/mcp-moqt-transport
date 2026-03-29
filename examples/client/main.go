@@ -25,7 +25,7 @@ func main() {
 
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    "example-client",
-		Version: "v0.2.0",
+		Version: "v0.3.0",
 	}, nil)
 
 	session, err := client.Connect(ctx, transport, nil)
