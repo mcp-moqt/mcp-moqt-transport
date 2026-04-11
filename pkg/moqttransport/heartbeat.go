@@ -55,6 +55,7 @@ func (h *Heartbeat) Start(ctx context.Context) error {
 func (h *Heartbeat) loop() {
 	ticker := time.NewTicker(h.config.Interval)
 	defer ticker.Stop()
+	defer h.running.Store(false)
 
 	for {
 		select {
@@ -76,7 +77,12 @@ func (h *Heartbeat) sendHeartbeat() {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- h.config.OnHeartbeat()
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			done <- h.config.OnHeartbeat()
+		}
 	}()
 
 	select {

@@ -53,7 +53,7 @@ func (h *subscribeHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWri
 // Discovery is implemented via FETCH on "mcp/discovery/sessions".
 // Response contains session_id and available control tracks.
 // Data tracks (resources/tools/notifications) are now implemented in v0.4.0.
-// Reliability features (ack/heartbeat/retry/metrics) are now implemented in v0.5.0.
+// Reliability features (ack/heartbeat/retry/metrics) are now implemented in v0.6.0.
 // discoveryHandler implements the server-side FETCH "mcp/discovery" "sessions".
 type discoveryHandler struct {
 	sessionID string

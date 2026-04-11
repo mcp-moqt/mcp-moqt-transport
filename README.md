@@ -4,7 +4,7 @@
 
 ## 开发说明
 
-v0.5.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
+v0.6.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
 
 ## 概述
 
@@ -35,7 +35,27 @@ v0.5.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 
 ## 版本
 
-当前版本：v0.5.0
+当前版本：v0.6.0
+
+## v0.6.0 更新概述
+
+- **代码优化与完善**：
+  - 导出 `DataTrackHandler.SessionID()` 方法，提供会话ID访问。
+  - 导出 `Retry.CalculateDelay()` 和 `Retry.IsRetryable()` 方法，支持外部调用。
+  - 修复心跳检测在上下文取消时未正确停止的问题。
+  - 修复测试中的错误率计算和吞吐量计算问题。
+- **安全性修复**：
+  - TLS 证书有效期从 24 小时延长到 365 天。
+  - 添加 TLS 最低版本限制（TLS 1.2）。
+  - 修复心跳 goroutine 泄漏风险。
+  - 修复重试机制随机数生成器非线程安全问题。
+  - 添加消息大小限制（10MB），防止内存攻击。
+- **新增单元测试**：
+  - 消息确认机制单元测试（`ack_test.go`）。
+  - 心跳检测单元测试（`heartbeat_test.go`）。
+  - 重试机制单元测试（`retry_test.go`）。
+  - 监控指标单元测试（`metrics_test.go`）。
+  - 数据轨道处理器单元测试（`data_track_handler_test.go`）。
 
 ## v0.5.0 更新概述
 
@@ -174,7 +194,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.5.0",
+        Version: "v0.6.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
@@ -209,7 +229,7 @@ func main() {
 
     client := mcp.NewClient(&mcp.Implementation{
         Name:    "example-client",
-        Version: "v0.5.0",
+        Version: "v0.6.0",
     }, nil)
 
     session, err := client.Connect(ctx, transport, nil)
@@ -259,7 +279,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.5.0",
+        Version: "v0.6.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {

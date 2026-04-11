@@ -3,11 +3,18 @@ package mcpmoqt
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"sync/atomic"
 
 	"github.com/mengelbart/moqtransport"
 )
+
+const (
+	MaxMessageSize = 10 * 1024 * 1024
+)
+
+var ErrMessageTooLarge = errors.New("message size exceeds maximum allowed")
 
 type DataTrackHandler struct {
 	sessionID string
@@ -61,6 +68,10 @@ func (h *DataTrackHandler) Namespace() []string {
 
 func (h *DataTrackHandler) TrackType() DataTrackType {
 	return h.trackType
+}
+
+func (h *DataTrackHandler) SessionID() string {
+	return h.sessionID
 }
 
 func (h *DataTrackHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWriter, msg *moqtransport.SubscribeMessage) {
@@ -183,6 +194,10 @@ func (h *DataTrackHandler) Unsubscribe(trackName string) error {
 func (h *DataTrackHandler) HandleData(ctx context.Context, trackName string, data []byte) error {
 	if h.closed.Load() {
 		return ErrConnectionClosed
+	}
+
+	if len(data) > MaxMessageSize {
+		return ErrMessageTooLarge
 	}
 
 	h.mu.RLock()

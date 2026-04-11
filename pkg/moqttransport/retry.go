@@ -3,6 +3,7 @@ package mcpmoqt
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -30,6 +31,7 @@ type RetryableFunc func() error
 type Retry struct {
 	config RetryConfig
 	rand   *rand.Rand
+	mu     sync.Mutex
 }
 
 func NewRetry(config RetryConfig) *Retry {
@@ -56,7 +58,7 @@ func (r *Retry) Do(ctx context.Context, fn RetryableFunc) error {
 
 		lastErr = err
 
-		if !r.isRetryable(err) {
+		if !r.IsRetryable(err) {
 			return err
 		}
 
@@ -64,7 +66,7 @@ func (r *Retry) Do(ctx context.Context, fn RetryableFunc) error {
 			break
 		}
 
-		delay := r.calculateDelay(attempt)
+		delay := r.CalculateDelay(attempt)
 
 		select {
 		case <-ctx.Done():
@@ -93,7 +95,7 @@ func (r *Retry) DoWithResult(ctx context.Context, fn func() (interface{}, error)
 
 		lastErr = err
 
-		if !r.isRetryable(err) {
+		if !r.IsRetryable(err) {
 			return nil, err
 		}
 
@@ -101,7 +103,7 @@ func (r *Retry) DoWithResult(ctx context.Context, fn func() (interface{}, error)
 			break
 		}
 
-		delay := r.calculateDelay(attempt)
+		delay := r.CalculateDelay(attempt)
 
 		select {
 		case <-ctx.Done():
@@ -113,7 +115,7 @@ func (r *Retry) DoWithResult(ctx context.Context, fn func() (interface{}, error)
 	return nil, lastErr
 }
 
-func (r *Retry) calculateDelay(attempt int) time.Duration {
+func (r *Retry) CalculateDelay(attempt int) time.Duration {
 	delay := float64(r.config.InitialDelay)
 	for i := 1; i < attempt; i++ {
 		delay *= r.config.Multiplier
@@ -124,14 +126,16 @@ func (r *Retry) calculateDelay(attempt int) time.Duration {
 	}
 
 	if r.config.Jitter {
+		r.mu.Lock()
 		jitter := delay * 0.1 * r.rand.Float64()
+		r.mu.Unlock()
 		delay += jitter
 	}
 
 	return time.Duration(delay)
 }
 
-func (r *Retry) isRetryable(err error) bool {
+func (r *Retry) IsRetryable(err error) bool {
 	if len(r.config.RetryableErrors) == 0 {
 		return true
 	}
