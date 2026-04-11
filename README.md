@@ -4,7 +4,7 @@
 
 ## 开发说明
 
-v0.4.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
+v0.5.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
 
 ## 概述
 
@@ -35,7 +35,16 @@ v0.4.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 
 ## 版本
 
-当前版本：v0.4.0
+当前版本：v0.5.0
+
+## v0.5.0 更新概述
+
+- **新增可靠性功能**：
+  - 消息确认机制（`ack.go`）：支持 ACK/NACK 确认，超时检测。
+  - 心跳检测（`heartbeat.go`）：保持连接活跃，自动检测断线。
+  - 重试机制（`retry.go`）：指数退避重试策略。
+  - 监控指标（`metrics.go`）：消息统计、吞吐量、错误率等指标。
+- 新增功能示例代码（`examples/features/main.go`）。
 
 ## v0.4.0 更新概述
 
@@ -96,8 +105,13 @@ v0.4.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 - ✅ 实现 `resources/tools/notifications` 数据轨道（Draft: draft-jennings-mcp-over-moqt-00 §2.3/§2.4）。
 - ✅ 添加数据轨道的订阅和发布机制。
 - ✅ 扩展 discovery 响应，包含数据轨道信息。
+- ✅ 消息确认机制（ACK/NACK）。
+- ✅ 心跳检测机制。
+- ✅ 重试机制（指数退避）。
+- ✅ 监控指标（Prometheus 兼容）。
 - 🔜 完善数据轨道的单元测试和集成测试。
 - 🔜 添加数据轨道的高级功能（如流式传输、批量处理）。
+- 🔜 将可靠性功能集成到核心传输层。
 
 ## 快速上手
 
@@ -160,7 +174,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.4.0",
+        Version: "v0.5.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
@@ -195,7 +209,7 @@ func main() {
 
     client := mcp.NewClient(&mcp.Implementation{
         Name:    "example-client",
-        Version: "v0.4.0",
+        Version: "v0.5.0",
     }, nil)
 
     session, err := client.Connect(ctx, transport, nil)
@@ -245,7 +259,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.4.0",
+        Version: "v0.5.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
@@ -327,18 +341,23 @@ mcp-moqt-transport/
 │   ├── config/                # 配置管理（支持 YAML/JSON/环境变量）
 │   ├── logger/                # 日志记录
 │   └── moqttransport/         # 核心实现
+│       ├── ack.go               # 消息确认机制
 │       ├── client.go            # 客户端连接/会话封装
 │       ├── control_conn.go      # 控制轨道的 JSON-RPC 读写
 │       ├── data_tracks.go       # 数据轨道定义
 │       ├── data_track_handler.go # 数据轨道处理器
 │       ├── errors.go            # 错误类型定义
+│       ├── heartbeat.go         # 心跳检测机制
+│       ├── metrics.go           # 监控指标
 │       ├── new_transport.go     # 统一构造函数
 │       ├── options.go           # 可配置选项（addr/TLS/ALPN/QUIC）
 │       ├── quic_moq.go          # QUIC <-> moqtransport 适配
+│       ├── retry.go             # 重试机制
 │       ├── server.go            # 服务端连接/会话封装
 │       ├── session_handlers.go  # discovery / subscribe handler
 │       ├── session_id.go        # MCP Session ID 生成
 │       ├── tls.go               # TLS 默认行为与封装
+│       ├── track_base.go        # Track 基础设施
 │       └── transport.go         # MCP over MOQT 的 Transport/Connection 实现
 ├── test/
 │   ├── benchmark/             # 性能基准测试
@@ -356,10 +375,11 @@ mcp-moqt-transport/
 ├── docs/
 │   ├── api.md                # API 文档
 │   └── design.md             # 设计文档
-├── examples/                  # 示例：server/client/data_tracks
+├── examples/                  # 示例：server/client/data_tracks/features
 │   ├── client/
 │   ├── server/
-│   └── data_tracks/
+│   ├── data_tracks/
+│   └── features/              # 可靠性功能示例
 ├── config.example.yaml       # YAML 配置示例
 ├── config.example.json       # JSON 配置示例
 ├── .env.example              # 环境变量示例

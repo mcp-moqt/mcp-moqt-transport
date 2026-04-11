@@ -20,6 +20,10 @@ var (
 	ErrNoPublisher       = errors.New("no publisher available for data track")
 	ErrNoSubscriber      = errors.New("no subscriber registered for data track")
 	ErrInvalidDataTrack  = errors.New("invalid data track type")
+	ErrAckTimeout        = errors.New("acknowledgment timeout")
+	ErrHeartbeatFailed   = errors.New("heartbeat failed")
+	ErrMaxRetriesExceeded = errors.New("maximum retries exceeded")
+	ErrNotRetryable      = errors.New("error is not retryable")
 )
 
 type TransportError struct {

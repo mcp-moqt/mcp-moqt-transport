@@ -151,7 +151,7 @@ if err != nil {
 
 server := mcp.NewServer(&mcp.Implementation{
     Name:    "example-server",
-    Version: "v0.4.0",
+    Version: "v0.5.0",
 }, nil)
 
 if err := server.Run(ctx, transport); err != nil {
@@ -171,7 +171,7 @@ if err != nil {
 
 client := mcp.NewClient(&mcp.Implementation{
     Name:    "example-client",
-    Version: "v0.4.0",
+    Version: "v0.5.0",
 }, nil)
 	session, err := client.Connect(ctx, transport, nil)
 if err != nil {
@@ -182,4 +182,149 @@ defer session.Close()
 if err := session.Ping(ctx, nil); err != nil {
     log.Fatalf("ping: %v", err)
 }
+```
+
+## Reliability Features
+
+### Acknowledgment Tracker
+
+The `AckTracker` provides message acknowledgment tracking with timeout support.
+
+```go
+config := mcpmoqt.DefaultAckConfig()
+config.Timeout = 5 * time.Second
+
+tracker := mcpmoqt.NewAckTracker(config)
+defer tracker.Close()
+
+ackCh := tracker.Track("message-id")
+
+go func() {
+    time.Sleep(100 * time.Millisecond)
+    tracker.Ack("message-id")
+}()
+
+ack := <-ackCh
+fmt.Printf("Status: %v\n", ack.Status)
+```
+
+#### AckStatus
+
+```go
+type AckStatus int
+
+const (
+    AckStatusPending  AckStatus = iota
+    AckStatusAcked
+    AckStatusNacked
+    AckStatusTimeout
+)
+```
+
+### Heartbeat
+
+The `Heartbeat` provides connection health monitoring.
+
+```go
+config := mcpmoqt.DefaultHeartbeatConfig()
+config.Interval = 30 * time.Second
+config.OnHeartbeat = func() error {
+    return sendPing()
+}
+
+hb := mcpmoqt.NewHeartbeat(config)
+hb.Start(ctx)
+defer hb.Stop()
+
+fmt.Printf("Healthy: %v\n", hb.IsHealthy())
+```
+
+### Retry Mechanism
+
+The `Retry` provides exponential backoff retry logic.
+
+```go
+config := mcpmoqt.DefaultRetryConfig()
+config.MaxAttempts = 3
+config.Multiplier = 2.0
+
+retry := mcpmoqt.NewRetry(config)
+
+err := retry.Do(ctx, func() error {
+    return sendMessage()
+})
+```
+
+### Metrics
+
+The `Metrics` provides performance monitoring and statistics.
+
+```go
+metrics := mcpmoqt.NewMetrics()
+
+metrics.RecordMessageSent(100)
+metrics.RecordAck()
+metrics.RecordConnectionOpened()
+
+snapshot := metrics.Snapshot()
+fmt.Printf("Messages: %d\n", snapshot.MessagesSent)
+fmt.Printf("Ack Rate: %.2f%%\n", snapshot.AckRate*100)
+fmt.Printf("Throughput: %.2f bytes/sec\n", snapshot.ThroughputOut)
+```
+
+#### MetricsSnapshot
+
+```go
+type MetricsSnapshot struct {
+    MessagesSent      int64
+    MessagesReceived  int64
+    MessagesAcked     int64
+    MessagesNacked    int64
+    BytesSent         int64
+    BytesReceived     int64
+    Errors            int64
+    Retries           int64
+    ConnectionsActive int64
+    TracksActive      int64
+    Uptime            time.Duration
+    AckRate           float64
+    ErrorRate         float64
+    ThroughputIn      float64
+    ThroughputOut     float64
+}
+```
+
+## Data Tracks
+
+### DataTrackHandler
+
+The `DataTrackHandler` manages data tracks for resources, tools, and notifications.
+
+```go
+handler := mcpmoqt.NewDataTrackHandler("session-id", mcpmoqt.DataTrackResources)
+
+handler.Subscribe(ctx, "resource-name", func(msg *mcpmoqt.DataTrackMessage) error {
+    fmt.Printf("Received: %+v\n", msg)
+    return nil
+})
+
+handler.Publish(ctx, "resource-name", &mcpmoqt.DataTrackMessage{
+    TrackType: mcpmoqt.DataTrackResources,
+    TrackName: "resource-name",
+    Data:      map[string]interface{}{"key": "value"},
+})
+
+defer handler.Close()
+```
+
+### DataTrackType
+
+```go
+type DataTrackType string
+
+const (
+    DataTrackResources     DataTrackType = "resources"
+    DataTrackTools         DataTrackType = "tools"
+    DataTrackNotifications DataTrackType = "notifications"
+)
 ```

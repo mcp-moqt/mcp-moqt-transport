@@ -21,7 +21,7 @@ import (
 type subscribeHandler struct {
 	sessionID string
 	sendTrack string
-	sendSlot  *publisherSlot
+	sendSlot  *PublisherSlot
 }
 
 func (h *subscribeHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWriter, msg *moqtransport.SubscribeMessage) {
@@ -46,13 +46,14 @@ func (h *subscribeHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWri
 	if h.sessionID == "" {
 		h.sessionID = msg.Namespace[1]
 	}
-	h.sendSlot.set(rw)
+	h.sendSlot.Set(rw)
 }
 
 // Draft: draft-jennings-mcp-over-moqt-00 §2.2.x (discovery)
 // Discovery is implemented via FETCH on "mcp/discovery/sessions".
 // Response contains session_id and available control tracks.
 // Data tracks (resources/tools/notifications) are now implemented in v0.4.0.
+// Reliability features (ack/heartbeat/retry/metrics) are now implemented in v0.5.0.
 // discoveryHandler implements the server-side FETCH "mcp/discovery" "sessions".
 type discoveryHandler struct {
 	sessionID string

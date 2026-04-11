@@ -49,7 +49,7 @@ func (t *MOQTClientTransport) Connect(ctx context.Context) (Connection, error) {
 	conn := quicmoq.NewClient(quicConn)
 	
 	// Create publisher slot for client-to-server track
-	sendSlot := newPublisherSlot()
+	sendSlot := NewPublisherSlot()
 	
 	// Create MOQT session with no-op handler and subscribe handler
 	session := &moqtransport.Session{

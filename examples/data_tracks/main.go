@@ -27,7 +27,7 @@ func main() {
 	toolHandler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackTools)
 	notificationHandler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackNotifications)
 
-	err = resourceHandler.Subscribe("file-resource", func(msg *mcpmoqt.DataTrackMessage) error {
+	err = resourceHandler.Subscribe(ctx, "file-resource", func(msg *mcpmoqt.DataTrackMessage) error {
 		data, _ := json.MarshalIndent(msg, "", "  ")
 		fmt.Printf("Received resource update: %s\n", data)
 		return nil
@@ -36,7 +36,7 @@ func main() {
 		log.Printf("Failed to subscribe to resource: %v", err)
 	}
 
-	err = toolHandler.Subscribe("calculator-tool", func(msg *mcpmoqt.DataTrackMessage) error {
+	err = toolHandler.Subscribe(ctx, "calculator-tool", func(msg *mcpmoqt.DataTrackMessage) error {
 		data, _ := json.MarshalIndent(msg, "", "  ")
 		fmt.Printf("Received tool invocation: %s\n", data)
 		return nil
@@ -45,7 +45,7 @@ func main() {
 		log.Printf("Failed to subscribe to tool: %v", err)
 	}
 
-	err = notificationHandler.Subscribe("progress-notification", func(msg *mcpmoqt.DataTrackMessage) error {
+	err = notificationHandler.Subscribe(ctx, "progress-notification", func(msg *mcpmoqt.DataTrackMessage) error {
 		data, _ := json.MarshalIndent(msg, "", "  ")
 		fmt.Printf("Received notification: %s\n", data)
 		return nil
@@ -56,7 +56,7 @@ func main() {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "data-track-example-server",
-		Version: "v0.4.0",
+		Version: "v0.5.0",
 	}, nil)
 
 	resourceMsg := &mcpmoqt.DataTrackMessage{
@@ -75,16 +75,39 @@ func main() {
 
 	fmt.Println("Data track example initialized successfully")
 	fmt.Println("Data track handlers created:")
-	fmt.Printf("  - Resources: %v\n", mcpmoqt.DataTrackResources)
-	fmt.Printf("  - Tools: %v\n", mcpmoqt.DataTrackTools)
-	fmt.Printf("  - Notifications: %v\n", mcpmoqt.DataTrackNotifications)
+	fmt.Printf("  - Resources: %v (namespace: %v)\n", mcpmoqt.DataTrackResources, resourceHandler.Namespace())
+	fmt.Printf("  - Tools: %v (namespace: %v)\n", mcpmoqt.DataTrackTools, toolHandler.Namespace())
+	fmt.Printf("  - Notifications: %v (namespace: %v)\n", mcpmoqt.DataTrackNotifications, notificationHandler.Namespace())
 
 	data, _ := json.MarshalIndent(resourceMsg, "", "  ")
 	fmt.Printf("\nExample resource message:\n%s\n", data)
+
+	streamMsgs := []*mcpmoqt.DataTrackMessage{
+		{
+			TrackType: mcpmoqt.DataTrackResources,
+			TrackName: "batch-resource",
+			Data:      map[string]interface{}{"index": 1, "content": "First"},
+		},
+		{
+			TrackType: mcpmoqt.DataTrackResources,
+			TrackName: "batch-resource",
+			Data:      map[string]interface{}{"index": 2, "content": "Second"},
+		},
+		{
+			TrackType: mcpmoqt.DataTrackResources,
+			TrackName: "batch-resource",
+			Data:      map[string]interface{}{"index": 3, "content": "Third"},
+		},
+	}
+	fmt.Printf("\nExample stream: %d messages ready for batch publishing\n", len(streamMsgs))
 
 	fmt.Println("\nStarting server...")
 
 	if err := server.Run(ctx, transport); err != nil {
 		log.Printf("server error: %v", err)
 	}
+
+	defer resourceHandler.Close()
+	defer toolHandler.Close()
+	defer notificationHandler.Close()
 }
