@@ -52,8 +52,7 @@ func (h *subscribeHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWri
 // Draft: draft-jennings-mcp-over-moqt-00 §2.2.x (discovery)
 // Discovery is implemented via FETCH on "mcp/discovery/sessions".
 // Response contains session_id and available control tracks.
-// TODO (Draft: draft-jennings-mcp-over-moqt-00 §2.3/§2.4):
-// Reserve tracks for resources/tools/notifications. Not implemented in v0.3.0.
+// Data tracks (resources/tools/notifications) are now implemented in v0.4.0.
 // discoveryHandler implements the server-side FETCH "mcp/discovery" "sessions".
 type discoveryHandler struct {
 	sessionID string
@@ -90,13 +89,27 @@ func (h *discoveryHandler) handleDiscoveryFetch(rw moqtransport.ResponseWriter) 
 			"session_id": h.sessionID,
 			"server_info": map[string]any{
 				"name":             "mcp-moqt-transport",
-				"version":          "0.1.2",
+				"version":          "0.4.0",
 				"protocol_version": "2025-06-18",
 			},
 			"available_tracks": map[string]any{
 				"control": map[string]string{
 					"client_to_server": fmt.Sprintf("mcp/%s/control/%s", h.sessionID, trackClientToServer),
 					"server_to_client": fmt.Sprintf("mcp/%s/control/%s", h.sessionID, trackServerToClient),
+				},
+				"data": map[string]any{
+					"resources": map[string]string{
+						"namespace":   fmt.Sprintf("mcp/%s/resources", h.sessionID),
+						"description": "Track for resource data transfer",
+					},
+					"tools": map[string]string{
+						"namespace":   fmt.Sprintf("mcp/%s/tools", h.sessionID),
+						"description": "Track for tool invocation and results",
+					},
+					"notifications": map[string]string{
+						"namespace":   fmt.Sprintf("mcp/%s/notifications", h.sessionID),
+						"description": "Track for notification messages",
+					},
 				},
 			},
 		},

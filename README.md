@@ -4,7 +4,7 @@
 
 ## 开发说明
 
-v0.3.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
+v0.4.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
 
 ## 概述
 
@@ -19,6 +19,7 @@ v0.3.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 
 - MCP 消息映射到 MOQT 控制轨道对象（control tracks）。
 - discovery 通过 `mcp/discovery/sessions` 的 FETCH 完成。
+- 数据轨道支持：资源（resources）、工具（tools）、通知（notifications）。
 - 默认配置可直接在本地开发环境跑通。
 - 完善的错误处理机制，提供详细的错误信息。
 - 详细的代码注释，提高代码可读性。
@@ -34,7 +35,17 @@ v0.3.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 
 ## 版本
 
-当前版本：v0.3.0
+当前版本：v0.4.0
+
+## v0.4.0 更新概述
+
+- **新增数据轨道支持**：实现资源（resources）、工具（tools）、通知（notifications）数据轨道。
+- 新增 `data_tracks.go`：定义数据轨道类型和命名空间。
+- 新增 `data_track_handler.go`：实现数据轨道处理器，支持订阅和发布机制。
+- 扩展 discovery 响应，包含数据轨道信息。
+- 新增数据轨道示例代码（`examples/data_tracks/main.go`）。
+- 添加数据轨道相关的错误类型（`ErrNoPublisher`、`ErrNoSubscriber`、`ErrInvalidDataTrack`）。
+- 更新文档，添加数据轨道使用说明。
 
 ## v0.3.0 更新概述
 
@@ -82,8 +93,11 @@ v0.3.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 
 ## Roadmap / TODO
 
-- 预留 `resources/tools/notifications` 轨道（Draft: draft-jennings-mcp-over-moqt-00 §2.3/§2.4）。
-- v0.3.0 仅保留轨道命名与 TODO 注释，不实现具体业务语义；后续将补充订阅/发布与消息结构。
+- ✅ 实现 `resources/tools/notifications` 数据轨道（Draft: draft-jennings-mcp-over-moqt-00 §2.3/§2.4）。
+- ✅ 添加数据轨道的订阅和发布机制。
+- ✅ 扩展 discovery 响应，包含数据轨道信息。
+- 🔜 完善数据轨道的单元测试和集成测试。
+- 🔜 添加数据轨道的高级功能（如流式传输、批量处理）。
 
 ## 快速上手
 
@@ -146,7 +160,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.3.0",
+        Version: "v0.4.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
@@ -181,7 +195,7 @@ func main() {
 
     client := mcp.NewClient(&mcp.Implementation{
         Name:    "example-client",
-        Version: "v0.3.0",
+        Version: "v0.4.0",
     }, nil)
 
     session, err := client.Connect(ctx, transport, nil)
@@ -231,7 +245,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.3.0",
+        Version: "v0.4.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
@@ -315,6 +329,8 @@ mcp-moqt-transport/
 │   └── moqttransport/         # 核心实现
 │       ├── client.go            # 客户端连接/会话封装
 │       ├── control_conn.go      # 控制轨道的 JSON-RPC 读写
+│       ├── data_tracks.go       # 数据轨道定义
+│       ├── data_track_handler.go # 数据轨道处理器
 │       ├── errors.go            # 错误类型定义
 │       ├── new_transport.go     # 统一构造函数
 │       ├── options.go           # 可配置选项（addr/TLS/ALPN/QUIC）
@@ -340,9 +356,10 @@ mcp-moqt-transport/
 ├── docs/
 │   ├── api.md                # API 文档
 │   └── design.md             # 设计文档
-├── examples/                  # 示例：server/client
+├── examples/                  # 示例：server/client/data_tracks
 │   ├── client/
-│   └── server/
+│   ├── server/
+│   └── data_tracks/
 ├── config.example.yaml       # YAML 配置示例
 ├── config.example.json       # JSON 配置示例
 ├── .env.example              # 环境变量示例
@@ -378,7 +395,7 @@ mcp-moqt-transport/
 - [x] 添加完善的错误类型和错误处理机制
 - [x] 添加性能基准测试支持
 - [x] 添加 CI/CD 自动化集成
-- [ ] resources/tools/notifications 轨道与语义
+- [x] 实现数据轨道（resources/tools/notifications）
 
 ## 贡献
 

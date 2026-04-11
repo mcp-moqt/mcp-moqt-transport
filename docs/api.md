@@ -151,7 +151,7 @@ if err != nil {
 
 server := mcp.NewServer(&mcp.Implementation{
     Name:    "example-server",
-    Version: "v0.3.0",
+    Version: "v0.4.0",
 }, nil)
 
 if err := server.Run(ctx, transport); err != nil {
@@ -171,7 +171,7 @@ if err != nil {
 
 client := mcp.NewClient(&mcp.Implementation{
     Name:    "example-client",
-    Version: "v0.3.0",
+    Version: "v0.4.0",
 }, nil)
 	session, err := client.Connect(ctx, transport, nil)
 if err != nil {

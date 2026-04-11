@@ -24,7 +24,7 @@ func TestMCPServerClient_RunAndPing(t *testing.T) {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "test-server",
-		Version: "v0.3.0",
+		Version: "v0.4.0",
 	}, nil)
 
 	serverErrCh := make(chan error, 1)
@@ -44,7 +44,7 @@ func TestMCPServerClient_RunAndPing(t *testing.T) {
 
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    "test-client",
-		Version: "v0.3.0",
+		Version: "v0.4.0",
 	}, nil)
 
 	session, err := client.Connect(ctx, clientTransport, nil)

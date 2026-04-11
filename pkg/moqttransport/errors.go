@@ -17,6 +17,9 @@ var (
 	ErrQUICConfig        = errors.New("QUIC configuration error")
 	ErrDiscoveryFailed   = errors.New("discovery failed")
 	ErrSubscribeFailed   = errors.New("subscribe failed")
+	ErrNoPublisher       = errors.New("no publisher available for data track")
+	ErrNoSubscriber      = errors.New("no subscriber registered for data track")
+	ErrInvalidDataTrack  = errors.New("invalid data track type")
 )
 
 type TransportError struct {
