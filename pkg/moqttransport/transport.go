@@ -3,14 +3,16 @@ package mcpmoqt
 import (
 	"context"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mengelbart/moqtransport"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Transport re-exports the MCP SDK Transport interface.
+const (
+	DefaultMaxRequestID uint64 = 100
+)
+
 type Transport = mcp.Transport
 
-// Connection re-exports the MCP SDK Connection interface.
 type Connection = mcp.Connection
 
 // MOQTTransport is a transport that communicates over MOQT.

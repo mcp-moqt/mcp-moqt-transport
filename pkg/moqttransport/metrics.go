@@ -1,6 +1,7 @@
 package mcpmoqt
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -239,7 +240,10 @@ func (m *Metrics) Reset() {
 }
 
 var defaultMetrics = NewMetrics()
+var defaultMetricsMu sync.RWMutex
 
 func DefaultMetrics() *Metrics {
+	defaultMetricsMu.RLock()
+	defer defaultMetricsMu.RUnlock()
 	return defaultMetrics
 }

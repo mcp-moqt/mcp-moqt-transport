@@ -3,6 +3,7 @@ package mcpmoqt
 import (
 	"crypto/tls"
 	"errors"
+	"time"
 
 	"github.com/mcp-moqt/mcp-moqt-transport/pkg/config"
 	"github.com/quic-go/quic-go"
@@ -120,12 +121,16 @@ func WithConfigFromEnv() Option {
 // - ALPN: ["moq-00"]
 // - QUIC: Datagrams enabled
 func applyOptions(role transportRole, opts []Option) (*transportConfig, error) {
-	// Defaults: addr localhost:0, ALPN moq-00, QUIC datagrams enabled.
 	cfg := &transportConfig{
-		role:       role,
-		addr:       "localhost:0",
-		quicConfig: &quic.Config{EnableDatagrams: true},
-		alpn:       defaultALPN(),
+		role: role,
+		addr: "localhost:0",
+		quicConfig: &quic.Config{
+			EnableDatagrams:        true,
+			MaxIdleTimeout:         60 * time.Second,
+			HandshakeIdleTimeout:   30 * time.Second,
+			KeepAlivePeriod:        15 * time.Second,
+		},
+		alpn: defaultALPN(),
 	}
 	for _, opt := range opts {
 		if opt == nil {

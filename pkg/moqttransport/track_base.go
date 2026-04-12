@@ -32,7 +32,7 @@ func (s *PublisherSlot) Set(pub moqtransport.Publisher) {
 func (s *PublisherSlot) Get(ctx context.Context) (moqtransport.Publisher, error) {
 	select {
 	case <-ctx.Done():
-		return nil, context.Cause(ctx)
+		return nil, ctx.Err()
 	case <-s.ready:
 	}
 	s.mu.Lock()

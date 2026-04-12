@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -10,12 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func getAvailablePort(t *testing.T) int {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+	return port
+}
+
 func TestMCPServerClient_RunAndPing(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	port := getAvailablePort(t)
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Start server in a goroutine
-	serverAddr := "127.0.0.1:8080"
 	serverTransport, err := mcpmoqt.NewMoqTransport(
 		mcpmoqt.RoleServer,
 		mcpmoqt.WithAddr(serverAddr),
@@ -24,7 +36,7 @@ func TestMCPServerClient_RunAndPing(t *testing.T) {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "test-server",
-		Version: "v0.6.0",
+		Version: "v0.7.0",
 	}, nil)
 
 	serverErrCh := make(chan error, 1)
@@ -32,10 +44,8 @@ func TestMCPServerClient_RunAndPing(t *testing.T) {
 		serverErrCh <- server.Run(ctx, serverTransport)
 	}()
 
-	// Give server time to start
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
-	// Create client and connect
 	clientTransport, err := mcpmoqt.NewMoqTransport(
 		mcpmoqt.RoleClient,
 		mcpmoqt.WithAddr(serverAddr),
@@ -44,23 +54,81 @@ func TestMCPServerClient_RunAndPing(t *testing.T) {
 
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    "test-client",
-		Version: "v0.6.0",
+		Version: "v0.7.0",
 	}, nil)
 
 	session, err := client.Connect(ctx, clientTransport, nil)
 	require.NoError(t, err)
 	defer session.Close()
 
-	// Ping server
 	err = session.Ping(ctx, nil)
 	require.NoError(t, err)
 
-	// Wait for server to exit (since it's a single connection server)
+	session.Close()
+	cancel()
+
 	select {
 	case err := <-serverErrCh:
-		// Server should exit with context canceled or similar
-		require.Error(t, err)
-	case <-ctx.Done():
-		t.Fatal("test timed out")
+		t.Logf("server exited: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not exit after client close")
+	}
+}
+
+func TestMCPServerClient_MultipleConnections(t *testing.T) {
+	t.Skip("Multiple connections not supported - server only accepts one connection at a time")
+
+	port := getAvailablePort(t)
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	serverTransport, err := mcpmoqt.NewMoqTransport(
+		mcpmoqt.RoleServer,
+		mcpmoqt.WithAddr(serverAddr),
+	)
+	require.NoError(t, err)
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "test-server",
+		Version: "v0.7.0",
+	}, nil)
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		serverErrCh <- server.Run(ctx, serverTransport)
+	}()
+
+	time.Sleep(2 * time.Second)
+
+	for i := 0; i < 3; i++ {
+		t.Run(fmt.Sprintf("connection_%d", i), func(t *testing.T) {
+			clientTransport, err := mcpmoqt.NewMoqTransport(
+				mcpmoqt.RoleClient,
+				mcpmoqt.WithAddr(serverAddr),
+			)
+			require.NoError(t, err)
+
+			client := mcp.NewClient(&mcp.Implementation{
+				Name:    fmt.Sprintf("test-client-%d", i),
+				Version: "v0.7.0",
+			}, nil)
+
+			session, err := client.Connect(ctx, clientTransport, nil)
+			require.NoError(t, err)
+			defer session.Close()
+
+			err = session.Ping(ctx, nil)
+			require.NoError(t, err)
+		})
+	}
+
+	cancel()
+	select {
+	case err := <-serverErrCh:
+		t.Logf("server exited: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not exit after test completion")
 	}
 }

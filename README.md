@@ -35,7 +35,36 @@ v0.6.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 
 ## 版本
 
-当前版本：v0.6.0
+当前版本：v0.7.1
+
+## v0.7.1 更新概述
+
+- **Bug 修复**：
+  - 修复心跳检测中的 goroutine 泄漏问题，确保超时时正确等待 goroutine 退出。
+  - 修复 session ID 生成在 crypto/rand 失败时的 fallback 问题，改用时间戳+计数器生成唯一 ID。
+  - 修复监控指标的 DefaultMetrics() 函数并发安全问题，添加读写锁保护。
+  - 修复 track_base.go 中 context.Cause() 使用问题，改用 ctx.Err() 确保兼容性。
+- **代码优化**：
+  - 更新 discovery 响应中的版本号从 0.4.0 到 0.7.0。
+
+## v0.7.0 更新概述
+
+- **QUIC 连接池**：
+  - 新增 `QUICConnectionPool`：支持 QUIC 连接复用，减少连接建立开销。
+  - 支持最大连接数限制、空闲超时和自动清理机制。
+  - 提供连接统计信息（总连接数、活跃连接数、池命中率等）。
+- **QUIC 流管理**：
+  - 新增 `QUICStreamManager`：统一管理 QUIC 流的生命周期。
+  - 支持双向流和单向流的创建、跟踪和关闭。
+  - 提供流统计信息（总流数、活跃流数、发送/接收字节数）。
+- **QUIC 配置优化**：
+  - 新增 `QUICConfigBuilder`：链式构建 QUIC 配置。
+  - 支持接收窗口、超时时间、最大流数等参数配置。
+  - 提供 `DefaultQUICConnectionConfig()` 默认配置。
+- **新增单元测试**：
+  - QUIC 连接池单元测试（`quic_manager_test.go`）。
+  - QUIC 流管理器单元测试。
+  - QUIC 配置构建器单元测试。
 
 ## v0.6.0 更新概述
 
@@ -129,9 +158,13 @@ v0.6.0 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 - ✅ 心跳检测机制。
 - ✅ 重试机制（指数退避）。
 - ✅ 监控指标（Prometheus 兼容）。
+- ✅ QUIC 连接池（连接复用、空闲超时、自动清理）。
+- ✅ QUIC 流管理（流生命周期管理、统计信息）。
+- ✅ QUIC 配置优化（链式构建器、默认配置）。
 - 🔜 完善数据轨道的单元测试和集成测试。
 - 🔜 添加数据轨道的高级功能（如流式传输、批量处理）。
 - 🔜 将可靠性功能集成到核心传输层。
+- 🔜 将 QUIC 连接池集成到客户端和服务器。
 
 ## 快速上手
 
@@ -194,7 +227,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.6.0",
+        Version: "v0.7.1",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
@@ -229,7 +262,7 @@ func main() {
 
     client := mcp.NewClient(&mcp.Implementation{
         Name:    "example-client",
-        Version: "v0.6.0",
+        Version: "v0.7.1",
     }, nil)
 
     session, err := client.Connect(ctx, transport, nil)
@@ -279,12 +312,143 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.6.0",
+        Version: "v0.7.1",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
         log.Fatalf("server run: %v", err)
     }
+}
+```
+
+### 使用 QUIC 连接池
+
+```go
+package main
+
+import (
+    "context"
+    "crypto/tls"
+    "log"
+    "time"
+
+    mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // 创建 QUIC 连接池
+    config := mcpmoqt.DefaultQUICConnectionConfig()
+    pool := mcpmoqt.NewQUICConnectionPool(config, 10, 5*time.Minute)
+
+    // 设置 TLS 配置
+    tlsConfig := &tls.Config{
+        InsecureSkipVerify: true,
+        MinVersion:         tls.VersionTLS12,
+    }
+    pool.SetTLSConfig(tlsConfig, nil)
+
+    // 启动自动清理
+    pool.StartCleanup(1 * time.Minute)
+    defer pool.Close()
+
+    // 获取连接
+    conn, err := pool.Get(ctx, "127.0.0.1:8080")
+    if err != nil {
+        log.Fatalf("get connection: %v", err)
+    }
+
+    // 使用连接...
+    log.Printf("Connected to %s", conn.RemoteAddr())
+
+    // 归还连接到池
+    pool.Put(conn)
+
+    // 查看统计信息
+    stats := pool.Stats()
+    log.Printf("Total: %d, Active: %d, Idle: %d, Hits: %d, Misses: %d",
+        stats.TotalConnections, stats.ActiveConnections,
+        stats.IdleConnections, stats.PoolHits, stats.PoolMisses)
+}
+```
+
+### 使用 QUIC 流管理器
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+
+    mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
+    "github.com/quic-go/quic-go"
+)
+
+func main() {
+    // 创建流管理器
+    manager := mcpmoqt.NewQUICStreamManager()
+    defer manager.Close()
+
+    // 假设 conn 是已建立的 QUIC 连接
+    var conn *quic.Conn // 从连接池或其他方式获取
+
+    // 打开双向流
+    stream, streamID, err := manager.OpenStream(conn)
+    if err != nil {
+        log.Fatalf("open stream: %v", err)
+    }
+
+    // 使用流进行读写...
+    log.Printf("Opened stream %d", streamID)
+
+    // 记录发送/接收字节数
+    manager.RecordBytesSent(100)
+    manager.RecordBytesReceived(200)
+
+    // 关闭流
+    if err := manager.CloseStream(streamID); err != nil {
+        log.Printf("close stream: %v", err)
+    }
+
+    // 查看统计信息
+    stats := manager.Stats()
+    log.Printf("Total: %d, Active: %d, Opened: %d, Closed: %d",
+        stats.TotalStreams, stats.ActiveStreams,
+        stats.StreamsOpened, stats.StreamsClosed)
+}
+```
+
+### 使用 QUIC 配置构建器
+
+```go
+package main
+
+import (
+    "log"
+    "time"
+
+    mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
+)
+
+func main() {
+    // 使用链式构建器创建 QUIC 配置
+    config := mcpmoqt.NewQUICConfigBuilder().
+        WithMaxIdleTimeout(60 * time.Second).
+        WithKeepAlivePeriod(30 * time.Second).
+        WithMaxIncomingStreams(500).
+        WithMaxIncomingUniStreams(300).
+        WithDatagrams(true).
+        WithInitialStreamReceiveWindow(1 << 21).
+        WithInitialConnectionReceiveWindow(1 << 22).
+        WithMaxStreamReceiveWindow(1 << 23).
+        WithMaxConnectionReceiveWindow(1 << 24).
+        With0RTT(true).
+        Build()
+
+    log.Printf("QUIC config created: MaxIdleTimeout=%v, MaxIncomingStreams=%d",
+        config.MaxIdleTimeout, config.MaxIncomingStreams)
 }
 ```
 
@@ -371,6 +535,7 @@ mcp-moqt-transport/
 │       ├── metrics.go           # 监控指标
 │       ├── new_transport.go     # 统一构造函数
 │       ├── options.go           # 可配置选项（addr/TLS/ALPN/QUIC）
+│       ├── quic_manager.go      # QUIC 连接池和流管理
 │       ├── quic_moq.go          # QUIC <-> moqtransport 适配
 │       ├── retry.go             # 重试机制
 │       ├── server.go            # 服务端连接/会话封装

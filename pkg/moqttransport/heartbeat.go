@@ -77,16 +77,15 @@ func (h *Heartbeat) sendHeartbeat() {
 
 	done := make(chan error, 1)
 	go func() {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			done <- h.config.OnHeartbeat()
-		}
+		done <- h.config.OnHeartbeat()
 	}()
 
 	select {
+	case <-h.ctx.Done():
+		<-done
+		h.handleFailure(ErrTimeout)
 	case <-ctx.Done():
+		<-done
 		h.handleFailure(ErrTimeout)
 	case err := <-done:
 		if err != nil {

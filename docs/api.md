@@ -151,7 +151,7 @@ if err != nil {
 
 server := mcp.NewServer(&mcp.Implementation{
     Name:    "example-server",
-    Version: "v0.6.0",
+    Version: "v0.7.1",
 }, nil)
 
 if err := server.Run(ctx, transport); err != nil {
@@ -171,7 +171,7 @@ if err != nil {
 
 client := mcp.NewClient(&mcp.Implementation{
     Name:    "example-client",
-    Version: "v0.6.0",
+    Version: "v0.7.1",
 }, nil)
 	session, err := client.Connect(ctx, transport, nil)
 if err != nil {
@@ -186,7 +186,7 @@ if err := session.Ping(ctx, nil); err != nil {
 
 ## Reliability Features
 
-Reliability features (ack/heartbeat/retry/metrics) are now implemented in v0.6.0.
+Reliability features (ack/heartbeat/retry/metrics) are now implemented in v0.7.1.
 
 ### Acknowledgment Tracker
 

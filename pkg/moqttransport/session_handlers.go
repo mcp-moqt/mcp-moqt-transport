@@ -9,15 +9,6 @@ import (
 	"github.com/mengelbart/moqtransport"
 )
 
-// Draft: draft-jennings-mcp-over-moqt-00 §2.2.1
-// Control tracks: namespace "mcp/<session-id>/control", tracks:
-//   - client-to-server
-//   - server-to-client
-//
-// This implementation maps MCP JSON-RPC to MOQT objects on these tracks.
-// NOTE: This implementation targets moqtransport (draft-11, moq-00).
-// It is not wire-compatible with draft-16 stream/datagram encodings.
-// subscribeHandler accepts subscriptions to the local send track and exposes a Publisher via slot.
 type subscribeHandler struct {
 	sessionID string
 	sendTrack string
@@ -25,13 +16,10 @@ type subscribeHandler struct {
 }
 
 func (h *subscribeHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWriter, msg *moqtransport.SubscribeMessage) {
-	// Expected: namespace (mcp, <session-id>, control), track == our send track.
 	if len(msg.Namespace) != 3 || msg.Namespace[0] != controlNS0 || msg.Namespace[2] != controlNS2 {
 		rw.Reject(moqtransport.ErrorCodeSubscribeTrackDoesNotExist, "unknown namespace")
 		return
 	}
-	// If h.sessionID is empty, accept first matching subscription and bind it.
-	// This avoids ordering races between discovery and the peer subscribing.
 	if h.sessionID != "" && msg.Namespace[1] != h.sessionID {
 		rw.Reject(moqtransport.ErrorCodeSubscribeTrackDoesNotExist, "unknown session")
 		return
@@ -49,12 +37,6 @@ func (h *subscribeHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWri
 	h.sendSlot.Set(rw)
 }
 
-// Draft: draft-jennings-mcp-over-moqt-00 §2.2.x (discovery)
-// Discovery is implemented via FETCH on "mcp/discovery/sessions".
-// Response contains session_id and available control tracks.
-// Data tracks (resources/tools/notifications) are now implemented in v0.4.0.
-// Reliability features (ack/heartbeat/retry/metrics) are now implemented in v0.6.0.
-// discoveryHandler implements the server-side FETCH "mcp/discovery" "sessions".
 type discoveryHandler struct {
 	sessionID string
 
@@ -90,7 +72,7 @@ func (h *discoveryHandler) handleDiscoveryFetch(rw moqtransport.ResponseWriter) 
 			"session_id": h.sessionID,
 			"server_info": map[string]any{
 				"name":             "mcp-moqt-transport",
-				"version":          "0.4.0",
+				"version":          "0.7.0",
 				"protocol_version": "2025-06-18",
 			},
 			"available_tracks": map[string]any{
@@ -120,15 +102,16 @@ func (h *discoveryHandler) handleDiscoveryFetch(rw moqtransport.ResponseWriter) 
 	if err != nil {
 		return
 	}
+	
 	stream, err := fetchPublisher.FetchStream()
 	if err != nil {
 		return
 	}
 	defer stream.Close()
+	
 	_, _ = stream.WriteObject(0, 0, 0, 1, data)
 }
 
-// noOpHandler rejects everything (used on the client, which doesn't serve discovery).
 type noOpHandler struct{}
 
 func (noOpHandler) Handle(rw moqtransport.ResponseWriter, _ *moqtransport.Message) {
@@ -136,12 +119,9 @@ func (noOpHandler) Handle(rw moqtransport.ResponseWriter, _ *moqtransport.Messag
 }
 
 func runSession(ctx context.Context, s *moqtransport.Session, conn moqtransport.Connection) error {
-	// moqtransport.Session.Run is async-ish (it returns after handshake setup),
-	// but we still call it synchronously so any immediate error propagates.
 	if err := s.Run(conn); err != nil {
 		return err
 	}
-	// Close the session when ctx is done.
 	go func() {
 		<-ctx.Done()
 		_ = s.Close()
