@@ -72,7 +72,7 @@ func (h *discoveryHandler) handleDiscoveryFetch(rw moqtransport.ResponseWriter) 
 			"session_id": h.sessionID,
 			"server_info": map[string]any{
 				"name":             "mcp-moqt-transport",
-				"version":          "0.7.0",
+				"version":          "0.7.1",
 				"protocol_version": "2025-06-18",
 			},
 			"available_tracks": map[string]any{

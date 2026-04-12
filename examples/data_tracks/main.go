@@ -56,7 +56,7 @@ func main() {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "data-track-example-server",
-		Version: "v0.7.0",
+		Version: "v0.7.1",
 	}, nil)
 
 	resourceMsg := &mcpmoqt.DataTrackMessage{
