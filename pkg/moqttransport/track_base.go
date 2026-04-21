@@ -54,10 +54,14 @@ type TrackWriter struct {
 	slot      *PublisherSlot
 	nextGroup atomic.Uint64
 	closed    atomic.Bool
+	buffer    *DataBuffer
 }
 
 func NewTrackWriter(slot *PublisherSlot) *TrackWriter {
-	return &TrackWriter{slot: slot}
+	return &TrackWriter{
+		slot:   slot,
+		buffer: defaultBufferPool,
+	}
 }
 
 func (w *TrackWriter) Write(ctx context.Context, data []byte) error {
@@ -120,12 +124,14 @@ type TrackReader struct {
 	track  *moqtransport.RemoteTrack
 	closed atomic.Bool
 	done   chan struct{}
+	buffer *DataBuffer
 }
 
 func NewTrackReader(track *moqtransport.RemoteTrack) *TrackReader {
 	return &TrackReader{
-		track: track,
-		done:  make(chan struct{}),
+		track:  track,
+		done:   make(chan struct{}),
+		buffer: defaultBufferPool,
 	}
 }
 
@@ -147,7 +153,16 @@ func (r *TrackReader) Read(ctx context.Context) ([]byte, error) {
 		return nil, err
 	}
 
-	return obj.Payload, nil
+	// Allocate buffer from pool and copy payload
+	buf := r.buffer.Get()
+	*buf = append(*buf, obj.Payload...)
+	return *buf, nil
+}
+
+func (r *TrackReader) ReturnBuffer(buf *[]byte) {
+	if buf != nil {
+		r.buffer.Put(buf)
+	}
 }
 
 func (r *TrackReader) Close() error {

@@ -37,10 +37,17 @@ type controlConn struct {
 	mu        sync.Mutex
 	closeOnce sync.Once
 	done      chan struct{}
+
+	// For server-side connection management
+	OnClose func()
 }
 
-func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtransport.RemoteTrack, send *PublisherSlot) *controlConn {
+func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtransport.RemoteTrack, send *PublisherSlot, onClose ...func()) *controlConn {
 	readCtx, cancel := context.WithCancel(conn.Context())
+	var closeFunc func()
+	if len(onClose) > 0 {
+		closeFunc = onClose[0]
+	}
 	return &controlConn{
 		conn:       conn,
 		sessionID:  sessionID,
@@ -50,6 +57,7 @@ func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtra
 		readCtx:    readCtx,
 		cancelRead: cancel,
 		done:       make(chan struct{}),
+		OnClose:    closeFunc,
 	}
 }
 
@@ -114,6 +122,10 @@ func (c *controlConn) Close() error {
 		}
 		if c.conn != nil {
 			_ = c.conn.CloseWithError(0, "")
+		}
+		// Call OnClose callback if set
+		if c.OnClose != nil {
+			c.OnClose()
 		}
 	})
 	return nil

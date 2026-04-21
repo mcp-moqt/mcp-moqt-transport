@@ -4,7 +4,7 @@
 
 ## 开发说明
 
-v0.7.1 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
+v1.0.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
 
 ## 概述
 
@@ -35,7 +35,28 @@ v0.7.1 的实现与文档更新仍由 AI 辅助编写（OpenAI GPT-5，Codex）�
 
 ## 版本
 
-当前版本：v0.7.1
+当前版本：v1.0.0
+
+## v1.0.0 更新概述
+
+- **主要功能模块及特性**：
+  - QUIC 连接池：支持连接复用、空闲超时和自动清理机制
+  - QUIC 流管理：统一管理流的生命周期，提供流统计信息
+  - QUIC 配置优化：链式构建器，支持灵活的配置选项
+  - 数据轨道支持：资源（resources）、工具（tools）、通知（notifications）
+  - 可靠性功能：消息确认机制、心跳检测、重试机制、监控指标
+  - 多连接支持：服务器端支持管理多个客户端连接
+  - 完善的错误处理：详细的错误信息和错误类型
+  - 完整的测试套件：单元测试、集成测试、性能基准测试
+  - 详细的文档：API 文档和设计文档
+
+- **修复的已知问题**：
+  - 修复心跳检测中的 goroutine 泄漏问题
+  - 修复 session ID 生成在 crypto/rand 失败时的 fallback 问题
+  - 修复监控指标的 DefaultMetrics() 函数并发安全问题
+  - 修复 track_base.go 中 context.Cause() 使用问题
+  - 修复 discovery 机制中 InitialMaxRequestID 默认值为 0 的问题
+  - 修复集成测试超时问题
 
 ## v0.7.1 更新概述
 
@@ -227,7 +248,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.7.1",
+        Version: "v1.0.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
@@ -262,7 +283,7 @@ func main() {
 
     client := mcp.NewClient(&mcp.Implementation{
         Name:    "example-client",
-        Version: "v0.7.1",
+        Version: "v1.0.0",
     }, nil)
 
     session, err := client.Connect(ctx, transport, nil)
@@ -312,7 +333,7 @@ func main() {
 
     server := mcp.NewServer(&mcp.Implementation{
         Name:    "example-server",
-        Version: "v0.7.1",
+        Version: "v1.0.0",
     }, nil)
 
     if err := server.Run(ctx, transport); err != nil {
