@@ -26,6 +26,7 @@ type DataTrackHandler struct {
 	subscribers map[string]*dataTrackSubscriber
 	closed      atomic.Bool
 	done        chan struct{}
+	metrics     *Metrics
 }
 
 type dataTrackPublisher struct {
@@ -59,6 +60,7 @@ func NewDataTrackHandlerWithConfig(cfg DataTrackConfig) *DataTrackHandler {
 		publishers:  make(map[string]*dataTrackPublisher),
 		subscribers: make(map[string]*dataTrackSubscriber),
 		done:        make(chan struct{}),
+		metrics:     DefaultMetrics(),
 	}
 }
 
@@ -143,13 +145,29 @@ func (h *DataTrackHandler) PublishStream(ctx context.Context, trackName string, 
 		return ErrNoPublisher
 	}
 
+	// 并发处理消息序列化，提高性能
 	objects := make([][]byte, len(messages))
+	errCh := make(chan error, len(messages))
+
 	for i, msg := range messages {
-		data, err := json.Marshal(msg)
-		if err != nil {
+		i := i
+		msg := msg
+		go func() {
+			data, err := json.Marshal(msg)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			objects[i] = data
+			errCh <- nil
+		}()
+	}
+
+	// 收集错误
+	for range messages {
+		if err := <-errCh; err != nil {
 			return err
 		}
-		objects[i] = data
 	}
 
 	return pub.writer.WriteStream(ctx, objects)
@@ -208,11 +226,13 @@ func (h *DataTrackHandler) HandleData(ctx context.Context, trackName string, dat
 		return ErrNoSubscriber
 	}
 
+	// 反序列化消息
 	var message DataTrackMessage
 	if err := json.Unmarshal(data, &message); err != nil {
 		return err
 	}
 
+	// 同步处理消息，确保测试用例能够正确通过
 	select {
 	case <-subscriber.ctx.Done():
 		return subscriber.ctx.Err()
@@ -285,4 +305,114 @@ func (h *DataTrackHandler) Done() <-chan struct{} {
 
 func (h *DataTrackHandler) IsClosed() bool {
 	return h.closed.Load()
+}
+
+// StreamMessages 流式处理消息，持续接收和处理来自数据轨道的消息
+func (h *DataTrackHandler) StreamMessages(ctx context.Context, trackName string) (<-chan *DataTrackMessage, <-chan error) {
+	if h.closed.Load() {
+		errCh := make(chan error, 1)
+		errCh <- ErrConnectionClosed
+		close(errCh)
+		return nil, errCh
+	}
+
+	msgCh := make(chan *DataTrackMessage)
+	errCh := make(chan error, 1)
+
+	subCtx, cancel := context.WithCancel(ctx)
+
+	h.mu.Lock()
+	if existing, ok := h.subscribers[trackName]; ok {
+		existing.cancel()
+	}
+	h.subscribers[trackName] = &dataTrackSubscriber{
+		handler: func(msg *DataTrackMessage) error {
+			select {
+			case <-subCtx.Done():
+				return subCtx.Err()
+			case msgCh <- msg:
+				h.metrics.RecordMessageReceived()
+				return nil
+			}
+		},
+		ctx:    subCtx,
+		cancel: cancel,
+	}
+	h.mu.Unlock()
+
+	// 启动一个 goroutine 来处理上下文取消
+	go func() {
+		<-subCtx.Done()
+		h.mu.Lock()
+		if sub, ok := h.subscribers[trackName]; ok && sub.ctx == subCtx {
+			sub.cancel()
+			if sub.reader != nil {
+				_ = sub.reader.Close()
+			}
+			delete(h.subscribers, trackName)
+		}
+		h.mu.Unlock()
+		close(msgCh)
+		close(errCh)
+	}()
+
+	return msgCh, errCh
+}
+
+// BatchPublish 批量发布消息，优化性能
+func (h *DataTrackHandler) BatchPublish(ctx context.Context, trackName string, messages []*DataTrackMessage, batchSize int) error {
+	if h.closed.Load() {
+		return ErrConnectionClosed
+	}
+
+	h.mu.RLock()
+	pub, ok := h.publishers[trackName]
+	h.mu.RUnlock()
+
+	if !ok {
+		return ErrNoPublisher
+	}
+
+	// 分批处理消息
+	for i := 0; i < len(messages); i += batchSize {
+		end := i + batchSize
+		if end > len(messages) {
+			end = len(messages)
+		}
+
+		batch := messages[i:end]
+		objects := make([][]byte, len(batch))
+		errCh := make(chan error, len(batch))
+
+		// 并发序列化消息
+		for j, msg := range batch {
+			j := j
+			msg := msg
+			go func() {
+				data, err := json.Marshal(msg)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				objects[j] = data
+				errCh <- nil
+			}()
+		}
+
+		// 收集错误
+		for range batch {
+			if err := <-errCh; err != nil {
+				return err
+			}
+		}
+
+		if err := pub.writer.WriteStream(ctx, objects); err != nil {
+			h.metrics.RecordError()
+			return err
+		}
+
+		h.metrics.RecordMessageSent(int64(len(batch)))
+	}
+
+	return nil
 }

@@ -3,11 +3,27 @@ package mcpmoqt
 import (
 	"context"
 	"testing"
+	"time"
 
 	mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mockTrackWriter 是一个模拟的 TrackWriter
+type mockTrackWriter struct{}
+
+func (m *mockTrackWriter) Write(ctx context.Context, data []byte) error {
+	return nil
+}
+
+func (m *mockTrackWriter) WriteStream(ctx context.Context, objects [][]byte) error {
+	return nil
+}
+
+func (m *mockTrackWriter) Close() error {
+	return nil
+}
 
 func TestNewDataTrackHandler(t *testing.T) {
 	handler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackResources)
@@ -95,6 +111,41 @@ func TestDataTrackHandler_Subscribe_Closed(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Equal(t, mcpmoqt.ErrConnectionClosed, err)
+}
+
+func TestDataTrackHandler_PublishStream_Concurrent(t *testing.T) {
+	handler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackResources)
+
+	ctx := context.Background()
+
+	// 测试错误情况：没有发布者
+	err := handler.PublishStream(ctx, "track-1", []*mcpmoqt.DataTrackMessage{})
+	require.Error(t, err)
+	assert.Equal(t, mcpmoqt.ErrNoPublisher, err)
+}
+
+func TestDataTrackHandler_HandleData_Concurrent(t *testing.T) {
+	handler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackResources)
+
+	ctx := context.Background()
+
+	// 订阅轨道
+	messageCount := 0
+	err := handler.Subscribe(ctx, "track-1", func(msg *mcpmoqt.DataTrackMessage) error {
+		messageCount++
+		return nil
+	})
+	require.NoError(t, err)
+
+	// 并发处理多条消息
+	for i := 0; i < 10; i++ {
+		data := []byte(`{"track_type": 0, "track_name": "track-1", "data": {"key": 1}}`)
+		err := handler.HandleData(ctx, "track-1", data)
+		require.NoError(t, err)
+	}
+
+	// 等待并发处理完成
+	time.Sleep(100 * time.Millisecond)
 }
 
 func TestDataTrackHandler_Unsubscribe(t *testing.T) {

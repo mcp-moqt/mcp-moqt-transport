@@ -25,7 +25,7 @@ func main() {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "example-server",
-		Version: "v1.0.0",
+		Version: "1.1.0",
 	}, nil)
 
 	if err := server.Run(ctx, transport); err != nil {

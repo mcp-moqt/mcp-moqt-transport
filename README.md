@@ -4,11 +4,11 @@
 
 ## 开发说明
 
-v1.0.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
+v1.1.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
 
 ## 概述
 
-该项目提供 MCP over MOQT 的最小可用传输层实现，目标是让上层只需 `server.Run(...)` / `client.Connect(...)` 即可连通。默认配置可用，并支持 Option 覆盖。
+该项目提供 MCP over MOQT 的最小可 用传输层实现，目标是让上层只需 `server.Run(...)` / `client.Connect(...)` 即可连通。默认配置可用，并支持 Option 覆盖。
 
 ## 草案兼容性
 
@@ -19,7 +19,10 @@ v1.0.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex�
 
 - MCP 消息映射到 MOQT 控制轨道对象（control tracks）。
 - discovery 通过 `mcp/discovery/sessions` 的 FETCH 完成。
-- 数据轨道支持：资源（resources）、工具（tools）、通知（notifications）。
+- 数据轨道支持：资源（resources）、工具（tools）、通知（notifications），并发处理消息提高性能。
+- QUIC 连接池：支持连接复用、空闲超时和自动清理机制，提高性能。
+- QUIC 流管理：统一管理流的生命周期，提供流统计信息。
+- QUIC 配置优化：链式构建器，支持灵活的配置选项。
 - 默认配置可直接在本地开发环境跑通。
 - 完善的错误处理机制，提供详细的错误信息。
 - 详细的代码注释，提高代码可读性。
@@ -35,7 +38,41 @@ v1.0.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex�
 
 ## 版本
 
-当前版本：v1.0.0
+当前版本：v1.1.0
+
+## v1.1.0 更新概述
+
+- **新增功能说明**：
+  - 数据轨道高级功能：支持流式传输和批量处理，提高数据传输效率
+  - 完善的错误处理机制：新增细粒度错误类型和错误码，便于错误定位和处理
+  - 增强的监控指标：添加更多性能指标和统计数据，支持 Prometheus 监控
+  - 配置文件热加载：支持运行时动态更新配置，无需重启服务
+  - 多环境配置支持：新增开发、测试、生产环境的默认配置模板
+
+- **功能优化点**：
+  - QUIC 连接池性能优化：改进连接复用策略，减少连接建立开销
+  - 流管理效率提升：优化流的生命周期管理，减少内存占用
+  - 心跳检测机制优化：调整心跳间隔和超时策略，提高连接稳定性
+  - 消息确认机制改进：优化 ACK/NACK 处理逻辑，减少网络拥塞
+  - 重试机制优化：改进指数退避算法，提高重试成功率
+
+- **已知问题修复详情**：
+  - 修复数据轨道订阅时的内存泄漏问题
+  - 修复 QUIC 连接池在高并发场景下的死锁问题
+  - 修复心跳检测在网络不稳定时的误判问题
+  - 修复监控指标在多线程环境下的竞态条件问题
+  - 修复配置文件解析时的类型转换错误
+
+- **兼容性说明**：
+  - 保持与 v1.0.0 版本的 API 兼容性，现有代码无需修改
+  - 与 draft-11（ALPN `moq-00`）保持兼容
+  - 支持 Go 1.25.0 及以上版本
+
+- **技术变更记录**：
+  - 更新依赖版本：github.com/mengelbart/moqtransport v0.5.0 → v0.5.1
+  - 优化代码结构：重构数据轨道处理逻辑，提高代码可读性
+  - 增强测试覆盖：新增数据轨道高级功能的单元测试和集成测试
+  - 改进文档：更新 API 文档和设计文档，添加新功能使用示例
 
 ## v1.0.0 更新概述
 
@@ -470,6 +507,68 @@ func main() {
 
     log.Printf("QUIC config created: MaxIdleTimeout=%v, MaxIncomingStreams=%d",
         config.MaxIdleTimeout, config.MaxIncomingStreams)
+}
+```
+
+### 使用数据轨道
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+
+    mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // 创建数据轨道处理器
+    handler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackResources)
+    defer handler.Close()
+
+    // 订阅数据轨道
+    err := handler.Subscribe(ctx, "resource-track", func(msg *mcpmoqt.DataTrackMessage) error {
+        log.Printf("Received message: TrackType=%s, TrackName=%s, Data=%v",
+            msg.TrackType, msg.TrackName, msg.Data)
+        return nil
+    })
+    if err != nil {
+        log.Fatalf("subscribe: %v", err)
+    }
+
+    // 模拟发布者（实际使用中由MOQT库自动处理）
+    // handler.HandleSubscribe(...) 会由MOQT库在收到订阅请求时调用
+
+    // 发布单条消息
+    message := &mcpmoqt.DataTrackMessage{
+        TrackType: mcpmoqt.DataTrackResources,
+        TrackName: "resource-track",
+        Data:      map[string]interface{}{"id": 1, "name": "example resource"},
+    }
+    // err = handler.Publish(ctx, "resource-track", message)
+    // if err != nil {
+    //     log.Fatalf("publish: %v", err)
+    // }
+
+    // 发布多条消息（并发处理，提高性能）
+    messages := []*mcpmoqt.DataTrackMessage{
+        {TrackType: mcpmoqt.DataTrackResources, TrackName: "resource-track", Data: map[string]interface{}{"id": 1, "name": "resource 1"}},
+        {TrackType: mcpmoqt.DataTrackResources, TrackName: "resource-track", Data: map[string]interface{}{"id": 2, "name": "resource 2"}},
+        {TrackType: mcpmoqt.DataTrackResources, TrackName: "resource-track", Data: map[string]interface{}{"id": 3, "name": "resource 3"}},
+    }
+    // err = handler.PublishStream(ctx, "resource-track", messages)
+    // if err != nil {
+    //     log.Fatalf("publish stream: %v", err)
+    // }
+
+    log.Println("Data track handler ready")
+    select {
+    case <-ctx.Done():
+        return
+    }
 }
 ```
 

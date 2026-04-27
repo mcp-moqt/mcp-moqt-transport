@@ -38,6 +38,12 @@ type controlConn struct {
 	closeOnce sync.Once
 	done      chan struct{}
 
+	// Reliability features
+	ackTracker *AckTracker
+	heartbeat  *Heartbeat
+	retry      *Retry
+	metrics    *Metrics
+
 	// For server-side connection management
 	OnClose func()
 }
@@ -48,7 +54,14 @@ func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtra
 	if len(onClose) > 0 {
 		closeFunc = onClose[0]
 	}
-	return &controlConn{
+
+	// Initialize reliability features
+	ackTracker := NewAckTracker()
+	heartbeat := NewHeartbeat(DefaultHeartbeatConfig())
+	retry := NewRetry(DefaultRetryConfig())
+	metrics := DefaultMetrics()
+
+	c := &controlConn{
 		conn:       conn,
 		sessionID:  sessionID,
 		recv:       recv,
@@ -57,8 +70,27 @@ func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtra
 		readCtx:    readCtx,
 		cancelRead: cancel,
 		done:       make(chan struct{}),
+		ackTracker: ackTracker,
+		heartbeat:  heartbeat,
+		retry:      retry,
+		metrics:    metrics,
 		OnClose:    closeFunc,
 	}
+
+	// Start heartbeat
+	heartbeat.Start(readCtx, func() error {
+		// Send heartbeat message
+		// This would typically be a ping message to the server
+		return nil
+	}, func() {
+		// Handle heartbeat timeout
+		c.Close()
+	}, func() {
+		// Handle heartbeat reconnect
+		// This would typically reconnect to the server
+	})
+
+	return c
 }
 
 func (c *controlConn) SessionID() string { return c.sessionID }
@@ -102,7 +134,29 @@ func (c *controlConn) Write(ctx context.Context, msg jsonrpc.Message) error {
 		return err
 	}
 
-	return c.write.Write(ctx, data)
+	// Use retry mechanism for reliable delivery
+	err = c.retry.Do(ctx, func(ctx context.Context) error {
+		// Write the message
+		if err := c.write.Write(ctx, data); err != nil {
+			c.metrics.RecordError()
+			return err
+		}
+
+		// Track message for acknowledgment
+		// Note: This is a simplified implementation
+		// In a real-world scenario, you would need to extract a message ID
+		// from the JSON-RPC message and track it
+		// c.ackTracker.TrackMessage(messageID)
+
+		c.metrics.RecordMessageSent(1)
+		return nil
+	})
+
+	if err != nil {
+		c.metrics.RecordError()
+	}
+
+	return err
 }
 
 func (c *controlConn) Close() error {
@@ -111,6 +165,12 @@ func (c *controlConn) Close() error {
 		c.closed = true
 		close(c.done)
 		c.mu.Unlock()
+
+		// Stop reliability features
+		if c.heartbeat != nil {
+			c.heartbeat.Stop()
+		}
+
 		if c.cancelRead != nil {
 			c.cancelRead()
 		}
