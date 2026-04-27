@@ -1,10 +1,28 @@
 # MCP over MOQT Transport
 
+[![CI](https://github.com/mcp-moqt/mcp-moqt-transport/actions/workflows/ci.yml/badge.svg)](https://github.com/mcp-moqt/mcp-moqt-transport/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mcp-moqt/mcp-moqt-transport)](https://goreportcard.com/report/github.com/mcp-moqt/mcp-moqt-transport)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 简体中文说明：本项目为 MCP over MOQT 的 Go 实现，提供面向 MCP SDK 的 `Transport`/`Connection` 适配层，用于在 QUIC + MOQT 上承载 MCP 的 JSON-RPC 消息。
+
+## 项目简介
+
+MCP over MOQT Transport 是一个高性能、可靠的传输层实现，专为 MCP (Model Context Protocol) 设计，基于 QUIC 协议和 MOQT (Media over QUIC Transport) 技术。本项目提供了一个简洁的接口，使上层应用只需通过 `server.Run(...)` / `client.Connect(...)` 即可建立连接并进行通信。
+
+### 主要特性
+
+- **高性能传输**：基于 QUIC 协议，支持多路复用、0-RTT 连接和拥塞控制
+- **可靠性保证**：实现了消息确认机制、心跳检测和重试机制
+- **数据轨道支持**：支持资源（resources）、工具（tools）、通知（notifications）数据轨道
+- **连接池管理**：内置 QUIC 连接池，优化连接复用和资源使用
+- **灵活配置**：支持配置文件、环境变量和命令行参数
+- **完善的监控**：提供详细的监控指标，支持 Prometheus 集成
+- **易于集成**：与 MCP SDK 无缝集成，提供简洁的 API
 
 ## 开发说明
 
-v1.1.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
+v1.2.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex），主要覆盖统一入口、TLS 默认行为、注释与示例更新；后续开发将由人工进行系统性重构和优化。
 
 ## 概述
 
@@ -38,7 +56,37 @@ v1.1.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex�
 
 ## 版本
 
-当前版本：v1.1.0
+当前版本：v1.2.0
+
+## v1.2.0 更新概述
+
+- **项目结构优化**：
+  - 完善项目目录结构，符合成熟GitHub项目标准
+  - 创建CHANGELOG.md文件，规范版本变更记录
+  - 优化README.md文档，添加项目简介、主要特性和贡献指南
+  - 确保所有配置文件和示例代码的一致性
+
+- **文档完善**：
+  - 补充API文档和设计文档
+  - 添加贡献指南，规范社区贡献流程
+  - 完善安装指南和使用说明
+
+- **测试增强**：
+  - 确保所有单元测试和集成测试通过
+  - 优化测试覆盖范围
+  - 改进测试用例的可读性和维护性
+
+- **代码质量**：
+  - 通过go vet代码质量检查
+  - 优化代码结构和命名规范
+  - 提高代码可读性和可维护性
+
+## v1.1.1 更新概述
+
+- **依赖版本更新**：
+  - github.com/modelcontextprotocol/go-sdk: v1.4.0 → v1.5.0
+  - github.com/quic-go/quic-go: v0.53.0 → v0.59.0
+  - 提升协议兼容性和稳定性
 
 ## v1.1.0 更新概述
 
@@ -722,9 +770,35 @@ mcp-moqt-transport/
 - [x] 添加 CI/CD 自动化集成
 - [x] 实现数据轨道（resources/tools/notifications）
 
-## 贡献
+## 贡献指南
 
-欢迎提交 Issue 或 Pull Request。
+我们欢迎社区贡献！以下是参与本项目的步骤：
+
+### 提交 Issue
+
+- 报告 bug
+- 提出新功能建议
+- 讨论现有功能的改进
+
+### 提交 Pull Request
+
+1. **Fork 仓库**：在 GitHub 上 fork 本项目到您的个人账号
+2. **克隆仓库**：`git clone https://github.com/your-username/mcp-moqt-transport.git`
+3. **创建分支**：`git checkout -b feature/your-feature-name`
+4. **实现功能**：编写代码并确保通过测试
+5. **运行测试**：`go test ./test/...`
+6. **提交代码**：`git commit -m "Add your feature description"`
+7. **推送分支**：`git push origin feature/your-feature-name`
+8. **创建 PR**：在 GitHub 上创建 Pull Request，描述您的更改
+
+### 代码规范
+
+- 遵循 Go 语言的标准代码风格
+- 使用 `go fmt` 格式化代码
+- 为新功能添加测试
+- 确保所有测试通过
+- 编写清晰的代码注释
+
 
 ## 许可
 

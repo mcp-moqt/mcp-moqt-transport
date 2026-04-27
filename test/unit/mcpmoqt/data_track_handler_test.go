@@ -2,6 +2,7 @@ package mcpmoqt
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -399,4 +400,97 @@ func TestDataTrackInfo(t *testing.T) {
 	assert.Equal(t, mcpmoqt.DataTrackResources, info.Type)
 	assert.Equal(t, "test-track", info.TrackName)
 	assert.Len(t, info.Namespace, 3)
+}
+
+func TestDataTrackHandler_StreamMessages(t *testing.T) {
+	handler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackResources)
+	defer handler.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	msgCh, errCh := handler.StreamMessages(ctx, "track-1")
+
+	require.NotNil(t, msgCh)
+	require.NotNil(t, errCh)
+
+	// 发送测试消息
+	testMsg := &mcpmoqt.DataTrackMessage{
+		TrackType: mcpmoqt.DataTrackResources,
+		TrackName: "track-1",
+		Data:      map[string]interface{}{"key": "value"},
+	}
+
+	data, err := json.Marshal(testMsg)
+	require.NoError(t, err)
+
+	err = handler.HandleData(ctx, "track-1", data)
+	require.NoError(t, err)
+
+	// 接收消息
+	select {
+	case msg := <-msgCh:
+		require.NotNil(t, msg)
+		assert.Equal(t, mcpmoqt.DataTrackResources, msg.TrackType)
+		assert.Equal(t, "track-1", msg.TrackName)
+	case <-errCh:
+		t.Fatal("unexpected error")
+	case <-time.After(1 * time.Second):
+		t.Fatal("timeout waiting for message")
+	}
+
+	// 关闭上下文，停止流式处理
+	cancel()
+
+	// 不需要等待通道关闭，因为 defer handler.Close() 会处理这个
+}
+
+func TestDataTrackHandler_StreamMessages_Closed(t *testing.T) {
+	handler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackResources)
+	handler.Close()
+
+	ctx := context.Background()
+	msgCh, errCh := handler.StreamMessages(ctx, "track-1")
+
+	require.Nil(t, msgCh)
+	require.NotNil(t, errCh)
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		assert.Equal(t, mcpmoqt.ErrConnectionClosed, err)
+	case <-time.After(1 * time.Second):
+		t.Fatal("timeout waiting for error")
+	}
+}
+
+func TestDataTrackHandler_BatchPublish(t *testing.T) {
+	handler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackResources)
+	defer handler.Close()
+
+	ctx := context.Background()
+
+	// 测试错误情况：没有发布者
+	messages := []*mcpmoqt.DataTrackMessage{
+		{TrackType: mcpmoqt.DataTrackResources, TrackName: "track-1", Data: map[string]interface{}{"key": "value1"}},
+		{TrackType: mcpmoqt.DataTrackResources, TrackName: "track-1", Data: map[string]interface{}{"key": "value2"}},
+	}
+
+	err := handler.BatchPublish(ctx, "track-1", messages, 2)
+	require.Error(t, err)
+	assert.Equal(t, mcpmoqt.ErrNoPublisher, err)
+}
+
+func TestDataTrackHandler_BatchPublish_Closed(t *testing.T) {
+	handler := mcpmoqt.NewDataTrackHandler("session-123", mcpmoqt.DataTrackResources)
+	handler.Close()
+
+	ctx := context.Background()
+	messages := []*mcpmoqt.DataTrackMessage{
+		{TrackType: mcpmoqt.DataTrackResources, TrackName: "track-1", Data: map[string]interface{}{"key": "value"}},
+	}
+
+	err := handler.BatchPublish(ctx, "track-1", messages, 1)
+	require.Error(t, err)
+	assert.Equal(t, mcpmoqt.ErrConnectionClosed, err)
 }

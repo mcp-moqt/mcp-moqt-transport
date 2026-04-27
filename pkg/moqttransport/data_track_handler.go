@@ -316,7 +316,7 @@ func (h *DataTrackHandler) StreamMessages(ctx context.Context, trackName string)
 		return nil, errCh
 	}
 
-	msgCh := make(chan *DataTrackMessage)
+	msgCh := make(chan *DataTrackMessage, 10)
 	errCh := make(chan error, 1)
 
 	subCtx, cancel := context.WithCancel(ctx)
@@ -331,7 +331,7 @@ func (h *DataTrackHandler) StreamMessages(ctx context.Context, trackName string)
 			case <-subCtx.Done():
 				return subCtx.Err()
 			case msgCh <- msg:
-				h.metrics.RecordMessageReceived()
+				h.metrics.RecordMessageReceived(1)
 				return nil
 			}
 		},
@@ -411,7 +411,7 @@ func (h *DataTrackHandler) BatchPublish(ctx context.Context, trackName string, m
 			return err
 		}
 
-		h.metrics.RecordMessageSent(int64(len(batch)))
+		h.metrics.RecordMessageSent(len(batch))
 	}
 
 	return nil

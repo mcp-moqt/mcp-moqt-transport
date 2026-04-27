@@ -56,8 +56,7 @@ func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtra
 	}
 
 	// Initialize reliability features
-	ackTracker := NewAckTracker()
-	heartbeat := NewHeartbeat(DefaultHeartbeatConfig())
+	ackTracker := NewAckTracker(DefaultAckConfig())
 	retry := NewRetry(DefaultRetryConfig())
 	metrics := DefaultMetrics()
 
@@ -71,24 +70,31 @@ func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtra
 		cancelRead: cancel,
 		done:       make(chan struct{}),
 		ackTracker: ackTracker,
-		heartbeat:  heartbeat,
 		retry:      retry,
 		metrics:    metrics,
 		OnClose:    closeFunc,
 	}
 
-	// Start heartbeat
-	heartbeat.Start(readCtx, func() error {
+	// Initialize heartbeat with callbacks
+	heartbeatConfig := DefaultHeartbeatConfig()
+	heartbeatConfig.OnHeartbeat = func() error {
 		// Send heartbeat message
 		// This would typically be a ping message to the server
 		return nil
-	}, func() {
+	}
+	heartbeatConfig.OnTimeout = func() {
 		// Handle heartbeat timeout
 		c.Close()
-	}, func() {
+	}
+	heartbeatConfig.OnReconnect = func() {
 		// Handle heartbeat reconnect
 		// This would typically reconnect to the server
-	})
+	}
+	heartbeat := NewHeartbeat(heartbeatConfig)
+	c.heartbeat = heartbeat
+
+	// Start heartbeat
+	heartbeat.Start(readCtx)
 
 	return c
 }
@@ -135,7 +141,7 @@ func (c *controlConn) Write(ctx context.Context, msg jsonrpc.Message) error {
 	}
 
 	// Use retry mechanism for reliable delivery
-	err = c.retry.Do(ctx, func(ctx context.Context) error {
+	err = c.retry.Do(ctx, func() error {
 		// Write the message
 		if err := c.write.Write(ctx, data); err != nil {
 			c.metrics.RecordError()

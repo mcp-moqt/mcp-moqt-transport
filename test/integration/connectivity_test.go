@@ -36,7 +36,7 @@ func TestMCPServerClient_RunAndPing(t *testing.T) {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "test-server",
-		Version: "1.1.0",
+		Version: "1.2.0",
 	}, nil)
 
 	serverErrCh := make(chan error, 1)
@@ -54,7 +54,7 @@ func TestMCPServerClient_RunAndPing(t *testing.T) {
 
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    "test-client",
-		Version: "1.1.0",
+		Version: "1.2.0",
 	}, nil)
 
 	session, err := client.Connect(ctx, clientTransport, nil)
@@ -92,7 +92,7 @@ func TestMCPServerClient_MultipleConnections(t *testing.T) {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "test-server",
-		Version: "1.1.0",
+		Version: "1.2.0",
 	}, nil)
 
 	serverErrCh := make(chan error, 1)
@@ -112,7 +112,7 @@ func TestMCPServerClient_MultipleConnections(t *testing.T) {
 
 			client := mcp.NewClient(&mcp.Implementation{
 				Name:    fmt.Sprintf("test-client-%d", i),
-				Version: "1.1.0",
+				Version: "1.2.0",
 			}, nil)
 
 			session, err := client.Connect(ctx, clientTransport, nil)
