@@ -39,6 +39,12 @@ type transportConfig struct {
 
 	// metricsAddr is the Prometheus /metrics listen address (server only).
 	metricsAddr string
+
+	// Production TLS file paths (used when tlsServer/tlsClient not set explicitly).
+	tlsCertFile           string
+	tlsKeyFile            string
+	tlsCAFile             string
+	tlsInsecureSkipVerify bool
 }
 
 // Option is a function that configures the transport.
@@ -105,6 +111,31 @@ func WithMetricsAddr(addr string) Option {
 	}
 }
 
+// WithTLSCertFiles sets server TLS certificate and key file paths for production use.
+func WithTLSCertFiles(certFile, keyFile string) Option {
+	return func(c *transportConfig) error {
+		c.tlsCertFile = certFile
+		c.tlsKeyFile = keyFile
+		return nil
+	}
+}
+
+// WithTLSCAFile sets a CA bundle for client certificate verification.
+func WithTLSCAFile(caFile string) Option {
+	return func(c *transportConfig) error {
+		c.tlsCAFile = caFile
+		return nil
+	}
+}
+
+// WithTLSInsecureSkipVerify allows skipping TLS verification on the client (dev only).
+func WithTLSInsecureSkipVerify(skip bool) Option {
+	return func(c *transportConfig) error {
+		c.tlsInsecureSkipVerify = skip
+		return nil
+	}
+}
+
 // WithConfig loads options from a config.Config object.
 func WithConfig(cfg *config.Config) Option {
 	return func(c *transportConfig) error {
@@ -116,6 +147,10 @@ func WithConfig(cfg *config.Config) Option {
 		c.alpn = cfg.ALPN
 		c.quicConfig = &quic.Config{EnableDatagrams: cfg.EnableDatagrams}
 		c.metricsAddr = cfg.MetricsAddr
+		c.tlsCertFile = cfg.TLS.CertFile
+		c.tlsKeyFile = cfg.TLS.KeyFile
+		c.tlsCAFile = cfg.TLS.CAFile
+		c.tlsInsecureSkipVerify = cfg.TLS.InsecureSkipVerify
 
 		return nil
 	}

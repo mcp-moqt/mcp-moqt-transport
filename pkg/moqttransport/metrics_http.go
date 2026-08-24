@@ -81,9 +81,14 @@ func (s *MetricsHTTPServer) handleMetrics(w http.ResponseWriter, _ *http.Request
 	writePromCounter(&b, "mcp_moqt_connections_total", "Total connections opened", float64(snap.ConnectionsTotal))
 	writePromGauge(&b, "mcp_moqt_connections_active", "Currently active connections", float64(snap.ConnectionsActive))
 	writePromGauge(&b, "mcp_moqt_tracks_active", "Currently active tracks", float64(snap.TracksActive))
+	writePromCounter(&b, "mcp_moqt_tracks_total", "Total tracks opened", float64(snap.TracksTotal))
+	writePromCounter(&b, "mcp_moqt_data_track_messages_total", "Total data track messages", float64(snap.DataTrackMessages))
+	writePromCounter(&b, "mcp_moqt_data_track_bytes_total", "Total data track payload bytes", float64(snap.DataTrackBytes))
 	writePromGauge(&b, "mcp_moqt_uptime_seconds", "Process metrics uptime in seconds", snap.Uptime.Seconds())
 	writePromGauge(&b, "mcp_moqt_ack_rate", "ACK rate (acked/sent)", snap.AckRate)
 	writePromGauge(&b, "mcp_moqt_error_rate", "Error rate", snap.ErrorRate)
+	writePromGauge(&b, "mcp_moqt_throughput_in_bytes_per_sec", "Inbound throughput (bytes/s)", snap.ThroughputIn)
+	writePromGauge(&b, "mcp_moqt_throughput_out_bytes_per_sec", "Outbound throughput (bytes/s)", snap.ThroughputOut)
 	_, _ = w.Write([]byte(b.String()))
 }
 

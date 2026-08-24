@@ -9,13 +9,26 @@
 
 MCP over MOQT Transport 是一个用 **Go** 实现的 MCP（Model Context Protocol）传输层，面向需要在本地或分布式环境中高效承载 MCP 消息的场景。本项目基于 **QUIC** 与 **MOQT（Media over QUIC Transport）**，将 MCP 的 JSON-RPC 消息映射到控制轨道与数据轨道，并提供与官方 MCP Go SDK 兼容的 `Transport` / `Connection` 接口；上层应用只需调用 `server.Run(...)` / `client.Connect(...)` 即可建立会话并进行通信。
 
-除高性能的 QUIC/MOQT 通路外，还支持 **stdio** 模式，便于接入 Cursor、Claude Desktop 等 MCP Host；同时内置 Tools、Prompts、Resources，以及 `mcp-moqt` CLI，方便安装、自检与本地演示。
+除高性能的 QUIC/MOQT 通路外，还支持 **stdio** 模式，便于接入 Cursor、Claude Desktop 等 MCP Host；同时内置工具、提示词、资源，以及 `mcp-moqt` CLI，方便安装、自检与本地演示。
 
-当前版本：**v1.4.0** · 变更记录见 [CHANGELOG.md](./CHANGELOG.md)
+当前版本：**v1.5.0** · 变更记录见 [CHANGELOG.md](./CHANGELOG.md)
+
+## 传输模式说明
+
+本项目提供两种 **互补** 的 MCP 接入方式，用途不同：
+
+| 模式 | 命令 | 传输 | 典型场景 |
+|------|------|------|----------|
+| **stdio** | `mcp-moqt server -stdio` | 标准输入/输出（不经 QUIC） | Cursor、Claude Desktop、MCP 平台上架 |
+| **QUIC/MOQT** | `mcp-moqt server -addr :8080` | QUIC + MOQT 控制轨/数据轨 | 服务间分布式 MCP、低延迟与多路复用 |
+
+- **stdio**：面向 MCP Host 集成，满足平台审核（工具 / 提示词 / 资源），配置见 `configs/mcp/`。
+- **QUIC/MOQT**：本项目的核心传输能力，适合自建部署与性能场景；生产配置见 [docs/deployment.md](./docs/deployment.md) 与 [docs/security.md](./docs/security.md)。
 
 ## 目录
 
 - [项目简介](#项目简介)
+- [传输模式说明](#传输模式说明)
 - [特性](#特性)
 - [草案兼容性](#草案兼容性)
 - [快速开始](#快速开始)
@@ -26,7 +39,7 @@ MCP over MOQT Transport 是一个用 **Go** 实现的 MCP（Model Context Protoc
 - [测试](#测试)
 - [项目结构](#项目结构)
 - [文档](#文档)
-- [Roadmap](#roadmap)
+- [路线图](#路线图)
 - [贡献](#贡献)
 - [许可](#许可)
 
@@ -35,7 +48,7 @@ MCP over MOQT Transport 是一个用 **Go** 实现的 MCP（Model Context Protoc
 - **高性能传输**：QUIC 多路复用、拥塞控制；可选 0-RTT（默认关闭）
 - **可靠性**：ACK/NACK 跟踪、心跳 keepalive、Write 重试、连接级 Metrics
 - **数据轨道**：resources / tools / notifications，支持 Publish / PublishStream / BatchPublish
-- **MCP 能力完备**：内置 Tools、Prompts、Resources（见下方能力表）
+- **MCP 能力完备**：内置工具、提示词、资源（见下方能力表）
 - **双传输模式**：`stdio`（平台托管）与 QUIC/MOQT（高性能）
 - **友好安装与 CLI**：安装脚本、`go install`、Make、Docker；`mcp-moqt`（server / client / doctor）
 - **连接池**：客户端 QUIC 连接池（Get / Put）
@@ -82,7 +95,7 @@ mcp-moqt client -addr 127.0.0.1:8080
 mcp-moqt doctor
 ```
 
-更完整的安装与 TLS 说明见 [docs/getting-started.md](./docs/getting-started.md)、[docs/security.md](./docs/security.md)。
+更完整的安装与 TLS 说明见英文文档 [docs/getting-started.md](./docs/getting-started.md)、[docs/security.md](./docs/security.md)（`docs/` 目录均为英文）。
 
 ## 安装
 
@@ -102,7 +115,7 @@ powershell -File scripts/install.ps1
 curl -fsSL https://raw.githubusercontent.com/mcp-moqt/mcp-moqt-transport/main/scripts/install.sh | bash
 ```
 
-### go install / Make / Docker
+### 使用 go install / Make / Docker
 
 ```bash
 go install github.com/mcp-moqt/mcp-moqt-transport/cmd/mcp-moqt@latest
@@ -113,22 +126,26 @@ make install && make server   # 或 make stdio / make client
 docker compose up --build
 ```
 
-## MCP 服务能力（Tools / Prompts / Resources）
+## MCP 服务能力（工具 / 提示词 / 资源）
 
 示例服务与 `mcp-moqt server` 默认注册以下能力：
 
 | 类型 | 名称 | 说明 |
 |------|------|------|
-| Tool | `health_check` | 健康检查与运行时信息 |
-| Tool | `get_transport_info` | 传输层能力与草案信息 |
-| Tool | `list_data_tracks` | 列出数据轨道 |
-| Tool | `estimate_rtt` | 简易 RTT 估算演示 |
-| Prompt | `debug_moqt_session` | 会话排查提示词 |
-| Prompt | `configure_transport` | 配置助手提示词 |
-| Resource | `moqt://docs/overview` | 服务概述 |
-| Resource | `moqt://config/example` | 示例 YAML 配置 |
-| Resource | `moqt://tracks/catalog` | 数据轨道目录 |
-| Resource | `moqt://install/quickstart` | 友好安装说明 |
+| 工具 | `health_check` | 健康检查与运行时信息 |
+| 工具 | `get_transport_info` | 传输层能力与草案信息 |
+| 工具 | `list_data_tracks` | 列出数据轨道 |
+| 工具 | `estimate_rtt` | 简易 RTT 估算演示 |
+| 工具 | `validate_config` | 校验 YAML/JSON 配置文件 |
+| 工具 | `export_metrics` | 导出传输层指标快照 |
+| 提示词 | `debug_moqt_session` | 会话排查提示词 |
+| 提示词 | `configure_transport` | 配置助手提示词 |
+| 资源 | `moqt://docs/overview` | 服务概述 |
+| 资源 | `moqt://config/example` | 示例 YAML 配置 |
+| 资源 | `moqt://tracks/catalog` | 数据轨道目录 |
+| 资源 | `moqt://install/quickstart` | 友好安装说明 |
+| 资源 | `moqt://docs/deployment` | 生产部署指南 |
+| 资源 | `moqt://docs/security` | 安全与 TLS 清单 |
 
 ```go
 import "github.com/mcp-moqt/mcp-moqt-transport/pkg/mcpservice"
@@ -276,16 +293,18 @@ mcp-moqt-transport/
 
 | 文档 | 说明 |
 |------|------|
-| [docs/getting-started.md](./docs/getting-started.md) | 快速开始（中英） |
-| [docs/capabilities.md](./docs/capabilities.md) | Tools / Prompts / Resources |
-| [docs/api.md](./docs/api.md) | 公共 API |
-| [docs/design.md](./docs/design.md) | 设计与架构 |
-| [docs/security.md](./docs/security.md) | TLS 与安全 |
-| [docs/configuration.md](./docs/configuration.md) | 配置、热加载、metrics、多连接 |
+| [docs/getting-started.md](./docs/getting-started.md) | 快速开始（英文） |
+| [docs/capabilities.md](./docs/capabilities.md) | 工具 / 提示词 / 资源（英文） |
+| [docs/api.md](./docs/api.md) | 公共 API（英文） |
+| [docs/design.md](./docs/design.md) | 设计与架构（英文） |
+| [docs/deployment.md](./docs/deployment.md) | 生产部署（英文） |
+| [docs/security.md](./docs/security.md) | 安全与 TLS 清单（英文） |
+| [configs/grafana/](./configs/grafana/) | Grafana 仪表盘样例 |
+| [docs/configuration.md](./docs/configuration.md) | 配置、热加载、指标、多连接（英文） |
 | [configs/mcp/](./configs/mcp/) | Cursor / Claude Desktop 配置样例 |
 | [CHANGELOG.md](./CHANGELOG.md) | 版本变更 |
 
-## Roadmap
+## 路线图
 
 **已完成**
 
@@ -293,14 +312,15 @@ mcp-moqt-transport/
 - [x] 数据轨道（resources / tools / notifications）与 e2e 订阅
 - [x] ACK / 心跳 / 重试接入控制连接
 - [x] 客户端 QUIC 连接池；stdio 与 MCP Host 配置
-- [x] Tools / Prompts / Resources；安装脚本与 CLI
+- [x] 工具 / 提示词 / 资源；安装脚本与 CLI
 - [x] 多连接 Accept / Serve 循环
 - [x] Prometheus `/metrics` HTTP 暴露
 - [x] 配置文件热加载（`config.WatchFile`）
+- [x] 生产 TLS 配置与部署文档；Grafana 样例；`doctor` 网络探测
 
 **计划中**
 
-- （无）近期 Roadmap 项已在 v1.4.0 完成：多连接 Accept、`/metrics`、配置热加载
+- （无）近期 P0–P2 项已在 v1.5.0 完成
 
 ## 贡献
 
@@ -315,4 +335,4 @@ go test ./test/...
 
 ## 许可
 
-[MIT License](./LICENSE)
+[MIT 许可证](./LICENSE)

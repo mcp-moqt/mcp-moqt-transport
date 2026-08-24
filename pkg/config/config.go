@@ -19,6 +19,8 @@ type Config struct {
 	EnableDatagrams bool `json:"enable_datagrams" yaml:"enable_datagrams"`
 	// MetricsAddr 是 Prometheus /metrics HTTP 监听地址；空则不启动
 	MetricsAddr string `json:"metrics_addr" yaml:"metrics_addr"`
+	// TLS 证书与校验配置（生产环境推荐显式设置）
+	TLS TLSConfig `json:"tls" yaml:"tls"`
 }
 
 // DefaultConfig 返回默认配置
@@ -51,6 +53,18 @@ func LoadFromEnv() *Config {
 
 	if metricsAddr := os.Getenv("MCP_MOQT_METRICS_ADDR"); metricsAddr != "" {
 		config.MetricsAddr = metricsAddr
+	}
+	if cert := os.Getenv("MCP_MOQT_TLS_CERT"); cert != "" {
+		config.TLS.CertFile = cert
+	}
+	if key := os.Getenv("MCP_MOQT_TLS_KEY"); key != "" {
+		config.TLS.KeyFile = key
+	}
+	if ca := os.Getenv("MCP_MOQT_TLS_CA"); ca != "" {
+		config.TLS.CAFile = ca
+	}
+	if skip := os.Getenv("MCP_MOQT_TLS_INSECURE_SKIP_VERIFY"); skip == "true" {
+		config.TLS.InsecureSkipVerify = true
 	}
 
 	return config
@@ -123,6 +137,19 @@ func (c *Config) Validate() error {
 
 	if len(c.ALPN) == 0 {
 		return fmt.Errorf("alpn must not be empty")
+	}
+	if c.TLS.HasServerCert() {
+		if _, err := os.Stat(c.TLS.CertFile); err != nil {
+			return fmt.Errorf("tls cert_file: %w", err)
+		}
+		if _, err := os.Stat(c.TLS.KeyFile); err != nil {
+			return fmt.Errorf("tls key_file: %w", err)
+		}
+	}
+	if c.TLS.CAFile != "" {
+		if _, err := os.Stat(c.TLS.CAFile); err != nil {
+			return fmt.Errorf("tls ca_file: %w", err)
+		}
 	}
 
 	return nil

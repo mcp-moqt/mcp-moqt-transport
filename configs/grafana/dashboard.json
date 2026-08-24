@@ -1,0 +1,75 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "mcp_moqt_messages_sent_total", "legendFormat": "sent" },
+        { "expr": "mcp_moqt_messages_received_total", "legendFormat": "received" }
+      ],
+      "title": "MCP Messages",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [
+        { "expr": "mcp_moqt_connections_active", "legendFormat": "active" },
+        { "expr": "mcp_moqt_connections_total", "legendFormat": "total" }
+      ],
+      "title": "Connections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "targets": [
+        { "expr": "mcp_moqt_ack_rate", "legendFormat": "ack_rate" },
+        { "expr": "mcp_moqt_error_rate", "legendFormat": "error_rate" }
+      ],
+      "title": "Reliability Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "targets": [
+        { "expr": "mcp_moqt_throughput_in_bytes_per_sec", "legendFormat": "in B/s" },
+        { "expr": "mcp_moqt_throughput_out_bytes_per_sec", "legendFormat": "out B/s" }
+      ],
+      "title": "Throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "targets": [
+        { "expr": "mcp_moqt_data_track_messages_total", "legendFormat": "messages" },
+        { "expr": "mcp_moqt_tracks_active", "legendFormat": "tracks_active" }
+      ],
+      "title": "Data Tracks",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["mcp", "moqt"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "title": "MCP over MOQT Transport",
+  "uid": "mcp-moqt-transport",
+  "version": 1
+}

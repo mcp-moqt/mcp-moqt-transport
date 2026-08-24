@@ -129,7 +129,11 @@ func (h *DataTrackHandler) Publish(ctx context.Context, trackName string, messag
 		return err
 	}
 
-	return pub.writer.Write(ctx, data)
+	if err := pub.writer.Write(ctx, data); err != nil {
+		return err
+	}
+	DefaultMetrics().RecordDataTrackMessage(len(data))
+	return nil
 }
 
 func (h *DataTrackHandler) PublishStream(ctx context.Context, trackName string, messages []*DataTrackMessage) error {
@@ -237,6 +241,7 @@ func (h *DataTrackHandler) HandleData(ctx context.Context, trackName string, dat
 	case <-subscriber.ctx.Done():
 		return subscriber.ctx.Err()
 	default:
+		DefaultMetrics().RecordDataTrackMessage(len(data))
 		return subscriber.handler(&message)
 	}
 }

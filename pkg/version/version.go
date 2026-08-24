@@ -3,5 +3,5 @@ package version
 
 const (
 	Name    = "mcp-moqt-transport"
-	Version = "1.4.0"
+	Version = "1.5.0"
 )

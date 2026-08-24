@@ -38,12 +38,8 @@ func NewMOQTServerTransport(opts ...Option) (*MOQTServerTransport, error) {
 		return nil, err
 	}
 
-	if cfg.tlsServer == nil {
-		tlsCfg, err := defaultTLSConfig(roleServer, cfg.alpn)
-		if err != nil {
-			return nil, err
-		}
-		cfg.tlsServer = tlsCfg
+	if _, err := resolveServerTLS(cfg); err != nil {
+		return nil, err
 	}
 
 	poolCfg := DefaultQUICConnectionConfig()

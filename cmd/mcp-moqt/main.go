@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	appconfig "github.com/mcp-moqt/mcp-moqt-transport/pkg/config"
 	"github.com/mcp-moqt/mcp-moqt-transport/pkg/mcpservice"
 	mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -59,16 +60,37 @@ Examples:
   mcp-moqt server -addr 127.0.0.1:8080 -multi -metrics 127.0.0.1:9090
   mcp-moqt client -addr 127.0.0.1:8080
   mcp-moqt doctor
+  mcp-moqt doctor -addr 127.0.0.1:8080 -metrics 127.0.0.1:9090
+  mcp-moqt doctor -tls-cert server.crt -tls-key server.key
+  mcp-moqt server -config configs/config.production.yaml
 `)
 }
 
 func runServer(args []string) {
 	fs := flag.NewFlagSet("server", flag.ExitOnError)
 	addr := fs.String("addr", "127.0.0.1:8080", "QUIC listen address (ignored with -stdio)")
+	configPath := fs.String("config", "", "YAML/JSON config file (overrides -addr/-metrics TLS)")
 	stdio := fs.Bool("stdio", false, "serve over stdin/stdout (for Cursor / MCP hosts)")
 	metrics := fs.String("metrics", "", "Prometheus /metrics listen address (e.g. 127.0.0.1:9090)")
 	multi := fs.Bool("multi", false, "accept multiple QUIC clients (Serve loop)")
 	_ = fs.Parse(args)
+
+	opts := []mcpmoqt.Option{}
+	if *configPath != "" {
+		cfg, err := appconfig.LoadFromFile(*configPath)
+		if err != nil {
+			fatalf("load config: %v", err)
+		}
+		if err := cfg.Validate(); err != nil {
+			fatalf("invalid config: %v", err)
+		}
+		opts = append(opts, mcpmoqt.WithConfig(cfg))
+	} else {
+		opts = append(opts, mcpmoqt.WithAddr(*addr))
+		if *metrics != "" {
+			opts = append(opts, mcpmoqt.WithMetricsAddr(*metrics))
+		}
+	}
 
 	ctx := context.Background()
 	server := mcp.NewServer(&mcp.Implementation{
@@ -85,17 +107,12 @@ func runServer(args []string) {
 		return
 	}
 
-	opts := []mcpmoqt.Option{mcpmoqt.WithAddr(*addr)}
-	if *metrics != "" {
-		opts = append(opts, mcpmoqt.WithMetricsAddr(*metrics))
-	}
-
 	if *multi {
 		raw, err := mcpmoqt.NewMOQTServerTransport(opts...)
 		if err != nil {
 			fatalf("new transport: %v", err)
 		}
-		fmt.Printf("listening on %s (multi-accept; metrics=%q)\n", *addr, *metrics)
+		fmt.Printf("listening (multi-accept; metrics=%q)\n", *metrics)
 		if err := raw.Serve(ctx, func(ctx context.Context, conn mcpmoqt.Connection) error {
 			s := mcp.NewServer(&mcp.Implementation{
 				Name:    mcpservice.ServiceName,
@@ -119,7 +136,7 @@ func runServer(args []string) {
 		fatalf("new transport: %v", err)
 	}
 
-	fmt.Printf("listening on %s (QUIC/MOQT; tools/prompts/resources enabled; metrics=%q)\n", *addr, *metrics)
+	fmt.Printf("listening (QUIC/MOQT; tools/prompts/resources enabled; metrics=%q)\n", *metrics)
 	if err := server.Run(ctx, transport); err != nil {
 		fatalf("server run: %v", err)
 	}
@@ -159,6 +176,11 @@ func runClient(args []string) {
 func runDoctor(args []string) {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	skipCaps := fs.Bool("skip-capabilities", false, "skip in-memory tools/prompts/resources smoke test")
+	addr := fs.String("addr", "", "probe QUIC/MOQT server (e.g. 127.0.0.1:8080)")
+	metricsAddr := fs.String("metrics", "", "probe Prometheus /healthz (e.g. 127.0.0.1:9090)")
+	tlsCert := fs.String("tls-cert", "", "validate TLS certificate file")
+	tlsKey := fs.String("tls-key", "", "validate TLS private key file")
+	skipUDP := fs.Bool("skip-udp-bind", false, "skip local UDP port bind check for -addr")
 	_ = fs.Parse(args)
 
 	checks := []struct {
@@ -166,13 +188,15 @@ func runDoctor(args []string) {
 		ok   bool
 		hint string
 	}{
-		{"go toolchain", commandExists("go"), "https://go.dev/dl/"},
+		{"go toolchain", commandExists("go"), goVersionHint()},
 		{"service package", true, "pkg/mcpservice (tools/prompts/resources)"},
 		{"CLI entrypoint", true, "cmd/mcp-moqt"},
 		{"stdio mode", true, "mcp-moqt server -stdio"},
 		{"install scripts", true, "scripts/install.sh + scripts/install.ps1"},
 		{"docker compose", true, "docker compose up --build"},
 		{"mcp config samples", true, "configs/mcp/*.json"},
+		{"deployment docs", true, "docs/deployment.md"},
+		{"grafana sample", true, "configs/grafana/dashboard.json"},
 	}
 
 	fmt.Printf("doctor: %s %s\n", mcpservice.ServiceName, mcpservice.ServiceVersion)
@@ -192,6 +216,45 @@ func runDoctor(args []string) {
 			allOK = false
 		} else {
 			fmt.Printf("  [ok] capabilities smoke — tools/prompts/resources list+call/read\n")
+		}
+	}
+
+	if *tlsCert != "" || *tlsKey != "" {
+		if err := checkTLSCertPair(*tlsCert, *tlsKey); err != nil {
+			fmt.Printf("  [fail] tls cert pair — %v\n", err)
+			allOK = false
+		} else {
+			fmt.Printf("  [ok] tls cert pair — valid and not expired\n")
+		}
+	}
+
+	if *addr != "" && !*skipUDP {
+		if err := checkUDPPortBind(*addr); err != nil {
+			fmt.Printf("  [warn] udp bind %s — %v (port may be in use; use -skip-udp-bind to ignore)\n", *addr, err)
+		} else {
+			fmt.Printf("  [ok] udp bind %s — port available for listen\n", *addr)
+		}
+	}
+
+	if *addr != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), doctorProbeTimeout())
+		defer cancel()
+		if err := probeQUICServer(ctx, *addr); err != nil {
+			fmt.Printf("  [fail] quic probe %s — %v\n", *addr, err)
+			allOK = false
+		} else {
+			fmt.Printf("  [ok] quic probe %s — connect + ping\n", *addr)
+		}
+	}
+
+	if *metricsAddr != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), doctorProbeTimeout())
+		defer cancel()
+		if err := probeMetricsEndpoint(ctx, *metricsAddr); err != nil {
+			fmt.Printf("  [fail] metrics probe %s — %v\n", *metricsAddr, err)
+			allOK = false
+		} else {
+			fmt.Printf("  [ok] metrics probe %s — /healthz ok\n", *metricsAddr)
 		}
 	}
 

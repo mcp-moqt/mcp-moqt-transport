@@ -15,7 +15,8 @@ type Transport = mcp.Transport
 
 type Connection = mcp.Connection
 
-// MOQTTransport is a transport that communicates over MOQT.
+// MOQTTransport is a legacy struct for advanced MOQT session wiring.
+// Prefer NewMoqTransport(RoleServer|RoleClient, opts...) for MCP SDK integration.
 type MOQTTransport struct {
 	// Session is the underlying MOQT session
 	Session *moqtransport.Session
@@ -30,13 +31,8 @@ type MOQTTransport struct {
 	ControlTrackNamespace []string
 }
 
-// Connect implements the Transport interface.
+// Connect is not implemented on MOQTTransport; use NewMoqTransport instead.
 func (t *MOQTTransport) Connect(ctx context.Context) (Connection, error) {
-	if t.Session == nil {
-		return nil, NewTransportError("Connect", ErrSessionNotFound)
-	}
-
-	// This is a placeholder implementation
-	// The actual implementation is in server.go and client.go
+	_ = ctx
 	return nil, NewTransportError("Connect", ErrSessionNotFound)
 }

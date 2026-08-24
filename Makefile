@@ -35,6 +35,11 @@ client: build
 doctor: build
 	./bin/$(BIN)$(shell go env GOEXE) doctor
 
+multi-client: build
+	./bin/$(BIN)$(shell go env GOEXE) server -addr $(ADDR) -multi &
+	sleep 2
+	go run ./examples/multi_client -addr $(ADDR) -clients 3
+
 test:
 	go test ./test/...
 

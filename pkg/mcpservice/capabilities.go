@@ -9,7 +9,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/mcp-moqt/mcp-moqt-transport/pkg/config"
 	"github.com/mcp-moqt/mcp-moqt-transport/pkg/version"
+	mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -46,6 +48,16 @@ func registerTools(server *mcp.Server) {
 		Name:        "estimate_rtt",
 		Description: "根据往返样本估算简易 RTT（演示工具，不依赖真实网络探测）",
 	}, estimateRTT)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "validate_config",
+		Description: "校验 MCP over MOQT 传输层 YAML/JSON 配置文件是否有效",
+	}, validateConfig)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "export_metrics",
+		Description: "导出当前进程传输层指标快照（消息、连接、数据轨、吞吐等）",
+	}, exportMetrics)
 }
 
 type emptyInput struct{}
@@ -175,6 +187,50 @@ func estimateRTT(ctx context.Context, _ *mcp.CallToolRequest, in rttInput) (*mcp
 	return nil, out, nil
 }
 
+type validateConfigInput struct {
+	Path string `json:"path" jsonschema:"配置文件路径（YAML 或 JSON）"`
+}
+
+type validateConfigOutput struct {
+	Valid  bool   `json:"valid"`
+	Addr   string `json:"addr,omitempty"`
+	ALPN   string `json:"alpn,omitempty"`
+	HasTLS bool   `json:"has_tls_cert"`
+}
+
+func validateConfig(ctx context.Context, _ *mcp.CallToolRequest, in validateConfigInput) (*mcp.CallToolResult, validateConfigOutput, error) {
+	_ = ctx
+	if in.Path == "" {
+		return nil, validateConfigOutput{}, fmt.Errorf("path 不能为空")
+	}
+	cfg, err := config.LoadFromFile(in.Path)
+	if err != nil {
+		return nil, validateConfigOutput{}, err
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, validateConfigOutput{}, err
+	}
+	alpn := ""
+	if len(cfg.ALPN) > 0 {
+		alpn = cfg.ALPN[0]
+	}
+	return nil, validateConfigOutput{
+		Valid:  true,
+		Addr:   cfg.Addr,
+		ALPN:   alpn,
+		HasTLS: cfg.TLS.HasServerCert(),
+	}, nil
+}
+
+type exportMetricsOutput struct {
+	Snapshot mcpmoqt.MetricsSnapshot `json:"snapshot"`
+}
+
+func exportMetrics(ctx context.Context, _ *mcp.CallToolRequest, _ emptyInput) (*mcp.CallToolResult, exportMetricsOutput, error) {
+	_ = ctx
+	return nil, exportMetricsOutput{Snapshot: mcpmoqt.DefaultMetrics().Snapshot()}, nil
+}
+
 func registerPrompts(server *mcp.Server) {
 	server.AddPrompt(&mcp.Prompt{
 		Name:        "debug_moqt_session",
@@ -276,6 +332,20 @@ func registerResources(server *mcp.Server) {
 		Description: "友好安装与一键启动说明",
 		MIMEType:    "text/markdown",
 	}, handler)
+
+	server.AddResource(&mcp.Resource{
+		URI:         "moqt://docs/deployment",
+		Name:        "Deployment Guide",
+		Description: "生产部署指南（TLS、防火墙、多实例、Prometheus）",
+		MIMEType:    "text/markdown",
+	}, handler)
+
+	server.AddResource(&mcp.Resource{
+		URI:         "moqt://docs/security",
+		Name:        "Security Checklist",
+		Description: "生产安全清单与 TLS 配置说明",
+		MIMEType:    "text/markdown",
+	}, handler)
 }
 
 func resourceHandler() mcp.ResourceHandler {
@@ -300,6 +370,26 @@ func resourceHandler() mcp.ResourceHandler {
 ## 协议
 - ALPN: moq-00
 - Draft: moqtransport draft-11
+`,
+		"moqt://docs/deployment": `# 生产部署指南
+
+详见仓库 docs/deployment.md。
+
+要点：
+- QUIC 使用 UDP，需开放防火墙端口
+- 生产环境使用正式 TLS 证书（tls.cert_file / tls.key_file）
+- 启用 Prometheus：metrics_addr + Grafana 仪表盘（configs/grafana/）
+- 多客户端：mcp-moqt server -multi -addr :8080
+`,
+		"moqt://docs/security": `# 生产安全清单
+
+详见仓库 docs/security.md。
+
+要点：
+- 禁用 InsecureSkipVerify（客户端）
+- 绑定内网地址或前置防火墙
+- 定期运行 govulncheck 与依赖升级
+- 证书有效期监控（mcp-moqt doctor -tls-cert ...）
 `,
 		"moqt://config/example": `server:
   addr: "127.0.0.1:8080"
@@ -334,7 +424,7 @@ docker compose up --build
 		}
 		mime := "text/plain"
 		switch uri {
-		case "moqt://docs/overview", "moqt://install/quickstart":
+		case "moqt://docs/overview", "moqt://install/quickstart", "moqt://docs/deployment", "moqt://docs/security":
 			mime = "text/markdown"
 		case "moqt://config/example":
 			mime = "application/yaml"

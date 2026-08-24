@@ -27,12 +27,8 @@ func NewMOQTClientTransport(opts ...Option) (*MOQTClientTransport, error) {
 		return nil, err
 	}
 
-	if cfg.tlsClient == nil {
-		tlsCfg, err := defaultTLSConfig(roleClient, cfg.alpn)
-		if err != nil {
-			return nil, err
-		}
-		cfg.tlsClient = tlsCfg
+	if _, err := resolveClientTLS(cfg); err != nil {
+		return nil, err
 	}
 
 	poolCfg := DefaultQUICConnectionConfig()

@@ -1,8 +1,6 @@
-# Getting Started / 快速开始
+# Getting Started
 
-## English
-
-### Install
+## Install
 
 ```bash
 # From a local checkout
@@ -17,7 +15,7 @@ Windows:
 powershell -File scripts/install.ps1
 ```
 
-### Run (stdio — Cursor / Claude Desktop / MCP hosts)
+## Run (stdio — Cursor / Claude Desktop / MCP hosts)
 
 ```bash
 mcp-moqt server -stdio
@@ -29,65 +27,42 @@ Sample host configs:
 - `configs/mcp/claude_desktop.json`
 - `configs/mcp/generic.mcp.json`
 
-### Run (QUIC + MOQT)
+## Run (QUIC + MOQT)
 
 ```bash
 mcp-moqt server -addr 127.0.0.1:8080
 mcp-moqt client -addr 127.0.0.1:8080
 ```
 
-### Doctor
+Production config file:
+
+```bash
+mcp-moqt server -config configs/config.production.yaml
+```
+
+Multi-client server:
+
+```bash
+mcp-moqt server -addr 127.0.0.1:8080 -multi -metrics 127.0.0.1:9090
+```
+
+## Doctor
 
 ```bash
 mcp-moqt doctor
+mcp-moqt doctor -addr 127.0.0.1:8080 -metrics 127.0.0.1:9090
+mcp-moqt doctor -tls-cert server.crt -tls-key server.key
 ```
 
-Validates Go toolchain presence and runs an in-memory smoke test for tools / prompts / resources.
+Validates the Go toolchain, runs an in-memory smoke test for tools / prompts / resources, and optionally probes QUIC, metrics, and TLS certificates.
 
-### TLS note
+## TLS
 
 Local defaults use a self-signed server certificate and client `InsecureSkipVerify`.
-For production, pass real TLS configs via `WithTLSServerConfig` / `WithTLSClientConfig`. See [security.md](./security.md).
+For production, use `tls.cert_file` / `tls.key_file` in config or `WithTLSServerConfig` / `WithTLSClientConfig`. See [security.md](./security.md) and [deployment.md](./deployment.md).
 
----
+## Further reading
 
-## 简体中文
-
-### 安装
-
-```bash
-bash scripts/install.sh
-# 或
-go install github.com/mcp-moqt/mcp-moqt-transport/cmd/mcp-moqt@latest
-```
-
-Windows：
-
-```powershell
-powershell -File scripts/install.ps1
-```
-
-### 运行（stdio，适合 Cursor / 平台托管）
-
-```bash
-mcp-moqt server -stdio
-```
-
-配置样例见 `configs/mcp/`。
-
-### 运行（QUIC + MOQT）
-
-```bash
-mcp-moqt server -addr 127.0.0.1:8080
-mcp-moqt client -addr 127.0.0.1:8080
-```
-
-### 自检
-
-```bash
-mcp-moqt doctor
-```
-
-### TLS 说明
-
-本地默认：服务端自签名证书，客户端跳过校验。生产环境请使用正式证书，详见 [security.md](./security.md)。
+- [capabilities.md](./capabilities.md) — Tools, Prompts, Resources
+- [configuration.md](./configuration.md) — Config files, hot reload, metrics
+- [api.md](./api.md) — Public API

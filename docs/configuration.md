@@ -16,6 +16,26 @@ Environment variables:
 | `MCP_MOQT_ALPN` | Comma-separated ALPN list |
 | `MCP_MOQT_ENABLE_DATAGRAMS` | `true` / `false` |
 | `MCP_MOQT_METRICS_ADDR` | Prometheus `/metrics` listen address |
+| `MCP_MOQT_TLS_CERT` | Server TLS certificate file |
+| `MCP_MOQT_TLS_KEY` | Server TLS private key file |
+| `MCP_MOQT_TLS_CA` | Client CA bundle file |
+| `MCP_MOQT_TLS_INSECURE_SKIP_VERIFY` | Client skip verify (`true` = dev only) |
+
+Production YAML example: `configs/config.production.yaml`
+
+```yaml
+addr: "0.0.0.0:8080"
+metrics_addr: "127.0.0.1:9090"
+tls:
+  cert_file: "/etc/mcp-moqt/server.crt"
+  key_file: "/etc/mcp-moqt/server.key"
+```
+
+CLI:
+
+```bash
+mcp-moqt server -config configs/config.production.yaml
+```
 
 ## Hot reload
 

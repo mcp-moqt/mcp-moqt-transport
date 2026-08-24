@@ -29,7 +29,7 @@ func TestRegisterCapabilities_ExposesToolsPromptsResources(t *testing.T) {
 
 	tools, err := session.ListTools(ctx, nil)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(tools.Tools), 4)
+	require.GreaterOrEqual(t, len(tools.Tools), 6)
 
 	prompts, err := session.ListPrompts(ctx, nil)
 	require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestRegisterCapabilities_ExposesToolsPromptsResources(t *testing.T) {
 
 	resources, err := session.ListResources(ctx, nil)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(resources.Resources), 4)
+	require.GreaterOrEqual(t, len(resources.Resources), 6)
 
 	health, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "health_check"})
 	require.NoError(t, err)

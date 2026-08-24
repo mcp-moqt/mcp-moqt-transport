@@ -22,6 +22,8 @@ type Metrics struct {
 	connectionsActive atomic.Int64
 	tracksTotal       atomic.Int64
 	tracksActive      atomic.Int64
+	dataTrackMessages atomic.Int64
+	dataTrackBytes    atomic.Int64
 
 	startTime time.Time
 }
@@ -86,6 +88,11 @@ func (m *Metrics) RecordTrackClosed() {
 	m.tracksActive.Add(-1)
 }
 
+func (m *Metrics) RecordDataTrackMessage(bytes int) {
+	m.dataTrackMessages.Add(1)
+	m.dataTrackBytes.Add(int64(bytes))
+}
+
 func (m *Metrics) MessagesSent() int64 {
 	return m.messagesSent.Load()
 }
@@ -146,6 +153,14 @@ func (m *Metrics) TracksActive() int64 {
 	return m.tracksActive.Load()
 }
 
+func (m *Metrics) DataTrackMessages() int64 {
+	return m.dataTrackMessages.Load()
+}
+
+func (m *Metrics) DataTrackBytes() int64 {
+	return m.dataTrackBytes.Load()
+}
+
 func (m *Metrics) Uptime() time.Duration {
 	return time.Since(m.startTime)
 }
@@ -166,6 +181,8 @@ type MetricsSnapshot struct {
 	ConnectionsActive int64         `json:"connections_active"`
 	TracksTotal       int64         `json:"tracks_total"`
 	TracksActive      int64         `json:"tracks_active"`
+	DataTrackMessages int64         `json:"data_track_messages"`
+	DataTrackBytes    int64         `json:"data_track_bytes"`
 	Uptime            time.Duration `json:"uptime"`
 	AckRate           float64       `json:"ack_rate"`
 	ErrorRate         float64       `json:"error_rate"`
@@ -212,6 +229,8 @@ func (m *Metrics) Snapshot() MetricsSnapshot {
 		ConnectionsActive: m.ConnectionsActive(),
 		TracksTotal:       m.TracksTotal(),
 		TracksActive:      m.TracksActive(),
+		DataTrackMessages: m.DataTrackMessages(),
+		DataTrackBytes:    m.DataTrackBytes(),
 		Uptime:            m.Uptime(),
 		AckRate:           ackRate,
 		ErrorRate:         errorRate,
@@ -236,6 +255,8 @@ func (m *Metrics) Reset() {
 	m.connectionsActive.Store(0)
 	m.tracksTotal.Store(0)
 	m.tracksActive.Store(0)
+	m.dataTrackMessages.Store(0)
+	m.dataTrackBytes.Store(0)
 	m.startTime = time.Now()
 }
 

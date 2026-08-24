@@ -10,6 +10,8 @@ import (
 	"math/big"
 	"net"
 	"time"
+
+	"github.com/mcp-moqt/mcp-moqt-transport/pkg/config"
 )
 
 const defaultCertValidity = 365 * 24 * time.Hour
@@ -72,4 +74,50 @@ func defaultTLSConfig(role transportRole, alpn []string) (*tls.Config, error) {
 	default:
 		return nil, nil
 	}
+}
+
+func resolveServerTLS(cfg *transportConfig) (*tls.Config, error) {
+	if cfg.tlsServer != nil {
+		return cfg.tlsServer, nil
+	}
+	if cfg.tlsCertFile != "" && cfg.tlsKeyFile != "" {
+		tlsCfg, err := config.TLSConfig{
+			CertFile: cfg.tlsCertFile,
+			KeyFile:  cfg.tlsKeyFile,
+		}.LoadServerTLS(cfg.alpn)
+		if err != nil {
+			return nil, err
+		}
+		cfg.tlsServer = tlsCfg
+		return tlsCfg, nil
+	}
+	tlsCfg, err := defaultTLSConfig(roleServer, cfg.alpn)
+	if err != nil {
+		return nil, err
+	}
+	cfg.tlsServer = tlsCfg
+	return tlsCfg, nil
+}
+
+func resolveClientTLS(cfg *transportConfig) (*tls.Config, error) {
+	if cfg.tlsClient != nil {
+		return cfg.tlsClient, nil
+	}
+	if cfg.tlsCAFile != "" || cfg.tlsInsecureSkipVerify {
+		tlsCfg, err := config.TLSConfig{
+			CAFile:             cfg.tlsCAFile,
+			InsecureSkipVerify: cfg.tlsInsecureSkipVerify,
+		}.LoadClientTLS(cfg.alpn)
+		if err != nil {
+			return nil, err
+		}
+		cfg.tlsClient = tlsCfg
+		return tlsCfg, nil
+	}
+	tlsCfg, err := defaultTLSConfig(roleClient, cfg.alpn)
+	if err != nil {
+		return nil, err
+	}
+	cfg.tlsClient = tlsCfg
+	return tlsCfg, nil
 }

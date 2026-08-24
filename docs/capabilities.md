@@ -10,6 +10,8 @@ This service registers practical MCP **Tools**, **Prompts**, and **Resources** v
 | `get_transport_info` | ALPN, draft, feature list |
 | `list_data_tracks` | Available MOQT data tracks |
 | `estimate_rtt` | Simple RTT estimate from samples |
+| `validate_config` | Validate a YAML/JSON transport config file |
+| `export_metrics` | Export in-process transport metrics snapshot |
 
 ## Prompts
 
@@ -26,6 +28,8 @@ This service registers practical MCP **Tools**, **Prompts**, and **Resources** v
 | `moqt://config/example` | application/yaml |
 | `moqt://tracks/catalog` | application/json |
 | `moqt://install/quickstart` | text/markdown |
+| `moqt://docs/deployment` | text/markdown |
+| `moqt://docs/security` | text/markdown |
 
 ## Registration
 
