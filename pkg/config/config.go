@@ -17,6 +17,8 @@ type Config struct {
 	ALPN []string `json:"alpn" yaml:"alpn"`
 	// EnableDatagrams 是否启用 QUIC 数据报
 	EnableDatagrams bool `json:"enable_datagrams" yaml:"enable_datagrams"`
+	// MetricsAddr 是 Prometheus /metrics HTTP 监听地址；空则不启动
+	MetricsAddr string `json:"metrics_addr" yaml:"metrics_addr"`
 }
 
 // DefaultConfig 返回默认配置
@@ -45,6 +47,10 @@ func LoadFromEnv() *Config {
 	// 从环境变量加载是否启用数据报
 	if enableDatagrams := os.Getenv("MCP_MOQT_ENABLE_DATAGRAMS"); enableDatagrams != "" {
 		config.EnableDatagrams = enableDatagrams == "true"
+	}
+
+	if metricsAddr := os.Getenv("MCP_MOQT_METRICS_ADDR"); metricsAddr != "" {
+		config.MetricsAddr = metricsAddr
 	}
 
 	return config

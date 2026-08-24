@@ -249,15 +249,56 @@ func (h *DataTrackHandler) HandleRemoteTrack(trackName string, track *moqtranspo
 	reader := NewTrackReader(track)
 
 	h.mu.Lock()
-	if existing, ok := h.subscribers[trackName]; ok {
-		if existing.reader != nil {
-			_ = existing.reader.Close()
-		}
-		existing.reader = reader
+	sub, ok := h.subscribers[trackName]
+	if !ok {
+		h.mu.Unlock()
+		_ = reader.Close()
+		return ErrNoSubscriber
 	}
+	if sub.reader != nil {
+		_ = sub.reader.Close()
+	}
+	sub.reader = reader
+	ctx := sub.ctx
 	h.mu.Unlock()
 
+	go h.receiveLoop(ctx, trackName, reader)
 	return nil
+}
+
+// receiveLoop reads objects from a remote track and dispatches them to the subscriber handler.
+func (h *DataTrackHandler) receiveLoop(ctx context.Context, trackName string, reader *TrackReader) {
+	defer reader.Close()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-h.done:
+			return
+		default:
+		}
+
+		data, err := reader.Read(ctx)
+		if err != nil {
+			return
+		}
+		if err := h.HandleData(ctx, trackName, data); err != nil {
+			return
+		}
+	}
+}
+
+// AttachSessionSubscribe subscribes to a remote data track over an active MOQT session
+// and starts the receive loop into the registered handler.
+func (h *DataTrackHandler) AttachSessionSubscribe(ctx context.Context, session *moqtransport.Session, trackName string) error {
+	if h.closed.Load() {
+		return ErrConnectionClosed
+	}
+	remote, err := session.Subscribe(ctx, h.namespace, trackName)
+	if err != nil {
+		return err
+	}
+	return h.HandleRemoteTrack(trackName, remote)
 }
 
 func (h *DataTrackHandler) GetTrackInfo() []DataTrackInfo {

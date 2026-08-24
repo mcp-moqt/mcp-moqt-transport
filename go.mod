@@ -1,6 +1,6 @@
 module github.com/mcp-moqt/mcp-moqt-transport
 
-go 1.25.0
+go 1.25.13
 
 require (
 	github.com/mengelbart/moqtransport v0.5.0

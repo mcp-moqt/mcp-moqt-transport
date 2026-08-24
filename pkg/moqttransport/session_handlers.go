@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/mcp-moqt/mcp-moqt-transport/pkg/version"
 	"github.com/mengelbart/moqtransport"
 )
 
@@ -35,6 +36,37 @@ func (h *subscribeHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWri
 		h.sessionID = msg.Namespace[1]
 	}
 	h.sendSlot.Set(rw)
+}
+
+// compositeSubscribeHandler routes control and data-track subscriptions.
+type compositeSubscribeHandler struct {
+	control *subscribeHandler
+	data    []*DataTrackHandler
+}
+
+func (h *compositeSubscribeHandler) HandleSubscribe(rw *moqtransport.SubscribeResponseWriter, msg *moqtransport.SubscribeMessage) {
+	if len(msg.Namespace) == 3 && msg.Namespace[0] == controlNS0 && msg.Namespace[2] == controlNS2 {
+		h.control.HandleSubscribe(rw, msg)
+		return
+	}
+	for _, dh := range h.data {
+		ns := dh.Namespace()
+		if len(msg.Namespace) != len(ns) {
+			continue
+		}
+		match := true
+		for i := range ns {
+			if msg.Namespace[i] != ns[i] {
+				match = false
+				break
+			}
+		}
+		if match {
+			dh.HandleSubscribe(rw, msg)
+			return
+		}
+	}
+	rw.Reject(moqtransport.ErrorCodeSubscribeTrackDoesNotExist, "unknown namespace")
 }
 
 type discoveryHandler struct {
@@ -71,8 +103,8 @@ func (h *discoveryHandler) handleDiscoveryFetch(rw moqtransport.ResponseWriter) 
 		"result": map[string]any{
 			"session_id": h.sessionID,
 			"server_info": map[string]any{
-				"name":             "mcp-moqt-transport",
-				"version":          "0.7.1",
+				"name":             version.Name,
+				"version":          version.Version,
 				"protocol_version": "2025-06-18",
 			},
 			"available_tracks": map[string]any{
@@ -102,13 +134,13 @@ func (h *discoveryHandler) handleDiscoveryFetch(rw moqtransport.ResponseWriter) 
 	if err != nil {
 		return
 	}
-	
+
 	stream, err := fetchPublisher.FetchStream()
 	if err != nil {
 		return
 	}
 	defer stream.Close()
-	
+
 	_, _ = stream.WriteObject(0, 0, 0, 1, data)
 }
 

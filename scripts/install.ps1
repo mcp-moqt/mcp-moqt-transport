@@ -6,6 +6,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Resolve-Path (Join-Path $ScriptDir "..")
 
 Write-Host "==> MCP over MOQT friendly installer"
 Write-Host "    module : $Repo"
@@ -17,10 +19,21 @@ if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
 }
 
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
-
-Write-Host "==> Installing CLI (mcp-moqt)"
 $env:GOBIN = $BinDir
-go install "$Repo/cmd/mcp-moqt@$Version"
+
+$goMod = Join-Path $RepoRoot "go.mod"
+if ((Test-Path $goMod) -and (Select-String -Path $goMod -Pattern "module github.com/mcp-moqt/mcp-moqt-transport" -Quiet)) {
+    Write-Host "==> Installing CLI from local checkout ($RepoRoot)"
+    Push-Location $RepoRoot
+    try {
+        go install ./cmd/mcp-moqt
+    } finally {
+        Pop-Location
+    }
+} else {
+    Write-Host "==> Installing CLI via go install"
+    go install "$Repo/cmd/mcp-moqt@$Version"
+}
 
 $pathParts = $env:Path -split ";"
 if ($pathParts -notcontains $BinDir) {
@@ -36,11 +49,18 @@ Write-Host @"
 
 Install complete.
 
-Quick start:
+Quick start (stdio):
+  mcp-moqt server -stdio
+
+Quick start (QUIC/MOQT):
   mcp-moqt server -addr 127.0.0.1:8080
   mcp-moqt client -addr 127.0.0.1:8080
 
-Docker alternative:
+Config samples:
+  configs/mcp/cursor.mcp.json
+  configs/mcp/claude_desktop.json
+
+Docker:
   docker compose up --build
 
 "@

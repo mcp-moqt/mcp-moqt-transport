@@ -22,7 +22,7 @@ func TestRegisterCapabilities_ExposesToolsPromptsResources(t *testing.T) {
 	_, err := server.Connect(ctx, t1, nil)
 	require.NoError(t, err)
 
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "v1"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: mcpservice.ServiceVersion}, nil)
 	session, err := client.Connect(ctx, t2, nil)
 	require.NoError(t, err)
 	defer session.Close()

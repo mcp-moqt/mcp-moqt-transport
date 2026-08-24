@@ -2,6 +2,7 @@ package mcpmoqt
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -16,6 +17,8 @@ const (
 
 	trackClientToServer = "client-to-server"
 	trackServerToClient = "server-to-client"
+
+	heartbeatMethod = "notifications/moqt/heartbeat"
 )
 
 func controlNamespace(sessionID string) []string {
@@ -38,13 +41,11 @@ type controlConn struct {
 	closeOnce sync.Once
 	done      chan struct{}
 
-	// Reliability features
 	ackTracker *AckTracker
 	heartbeat  *Heartbeat
 	retry      *Retry
 	metrics    *Metrics
 
-	// For server-side connection management
 	OnClose func()
 }
 
@@ -55,10 +56,10 @@ func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtra
 		closeFunc = onClose[0]
 	}
 
-	// Initialize reliability features
 	ackTracker := NewAckTracker(DefaultAckConfig())
 	retry := NewRetry(DefaultRetryConfig())
 	metrics := DefaultMetrics()
+	metrics.RecordConnectionOpened()
 
 	c := &controlConn{
 		conn:       conn,
@@ -75,56 +76,74 @@ func newControlConn(conn moqtransport.Connection, sessionID string, recv *moqtra
 		OnClose:    closeFunc,
 	}
 
-	// Initialize heartbeat with callbacks
 	heartbeatConfig := DefaultHeartbeatConfig()
 	heartbeatConfig.OnHeartbeat = func() error {
-		// Send heartbeat message
-		// This would typically be a ping message to the server
-		return nil
+		c.metrics.RecordHeartbeatSent()
+		payload := []byte(`{"jsonrpc":"2.0","method":"` + heartbeatMethod + `"}`)
+		return c.write.Write(c.readCtx, payload)
 	}
 	heartbeatConfig.OnTimeout = func() {
-		// Handle heartbeat timeout
-		c.Close()
+		c.metrics.RecordHeartbeatFailed()
+		if c.heartbeat != nil && c.heartbeat.Failures() >= heartbeatConfig.MaxFailures {
+			_ = c.Close()
+		}
 	}
-	heartbeatConfig.OnReconnect = func() {
-		// Handle heartbeat reconnect
-		// This would typically reconnect to the server
-	}
-	heartbeat := NewHeartbeat(heartbeatConfig)
-	c.heartbeat = heartbeat
-
-	// Start heartbeat
-	heartbeat.Start(readCtx)
+	c.heartbeat = NewHeartbeat(heartbeatConfig)
+	_ = c.heartbeat.Start(readCtx)
 
 	return c
 }
 
 func (c *controlConn) SessionID() string { return c.sessionID }
 
+// MetricsSnapshot returns a point-in-time metrics snapshot for this connection.
+func (c *controlConn) MetricsSnapshot() MetricsSnapshot {
+	return c.metrics.Snapshot()
+}
+
 func (c *controlConn) Read(ctx context.Context) (jsonrpc.Message, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-c.done:
-		return nil, io.EOF
-	default:
-	}
-
-	combined, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go func() {
+	for {
 		select {
-		case <-c.readCtx.Done():
-			cancel()
-		case <-combined.Done():
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-c.done:
+			return nil, io.EOF
+		default:
 		}
-	}()
 
-	obj, err := c.recv.ReadObject(combined)
-	if err != nil {
-		return nil, err
+		combined, cancel := context.WithCancel(ctx)
+		go func() {
+			select {
+			case <-c.readCtx.Done():
+				cancel()
+			case <-combined.Done():
+			}
+		}()
+
+		obj, err := c.recv.ReadObject(combined)
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+
+		msg, err := jsonrpc.DecodeMessage(obj.Payload)
+		if err != nil {
+			c.metrics.RecordError()
+			return nil, err
+		}
+
+		c.metrics.RecordMessageReceived(len(obj.Payload))
+		if c.heartbeat != nil {
+			c.heartbeat.RecordPong()
+		}
+		c.handleInboundAck(msg)
+
+		if req, ok := msg.(*jsonrpc.Request); ok && req.Method == heartbeatMethod {
+			// Internal keepalive; do not surface to MCP layer.
+			continue
+		}
+		return msg, nil
 	}
-	return jsonrpc.DecodeMessage(obj.Payload)
 }
 
 func (c *controlConn) Write(ctx context.Context, msg jsonrpc.Message) error {
@@ -140,29 +159,82 @@ func (c *controlConn) Write(ctx context.Context, msg jsonrpc.Message) error {
 		return err
 	}
 
-	// Use retry mechanism for reliable delivery
+	msgID := extractMessageID(msg)
+	attempt := 0
 	err = c.retry.Do(ctx, func() error {
-		// Write the message
+		if attempt > 0 {
+			c.metrics.RecordRetry()
+		}
+		attempt++
+
 		if err := c.write.Write(ctx, data); err != nil {
 			c.metrics.RecordError()
 			return err
 		}
 
-		// Track message for acknowledgment
-		// Note: This is a simplified implementation
-		// In a real-world scenario, you would need to extract a message ID
-		// from the JSON-RPC message and track it
-		// c.ackTracker.TrackMessage(messageID)
-
-		c.metrics.RecordMessageSent(1)
+		c.metrics.RecordMessageSent(len(data))
+		if msgID != "" {
+			c.trackAckAsync(msgID)
+		}
 		return nil
 	})
 
 	if err != nil {
 		c.metrics.RecordError()
 	}
-
 	return err
+}
+
+func (c *controlConn) trackAckAsync(msgID string) {
+	ackCh := c.ackTracker.Track(msgID)
+	go func() {
+		select {
+		case ack, ok := <-ackCh:
+			if !ok || ack == nil {
+				return
+			}
+			switch ack.Status {
+			case AckStatusAcked:
+				c.metrics.RecordAck()
+			case AckStatusNacked:
+				c.metrics.RecordNack()
+			case AckStatusTimeout:
+				c.metrics.RecordTimeout()
+			}
+		case <-c.done:
+		}
+	}()
+}
+
+func (c *controlConn) handleInboundAck(msg jsonrpc.Message) {
+	switch m := msg.(type) {
+	case *jsonrpc.Response:
+		if !m.ID.IsValid() {
+			return
+		}
+		id := fmt.Sprint(m.ID.Raw())
+		if m.Error != nil {
+			c.ackTracker.Nack(id, m.Error)
+			c.metrics.RecordNack()
+			return
+		}
+		c.ackTracker.Ack(id)
+		c.metrics.RecordAck()
+	}
+}
+
+func extractMessageID(msg jsonrpc.Message) string {
+	switch m := msg.(type) {
+	case *jsonrpc.Request:
+		if m.ID.IsValid() {
+			return fmt.Sprint(m.ID.Raw())
+		}
+	case *jsonrpc.Response:
+		if m.ID.IsValid() {
+			return fmt.Sprint(m.ID.Raw())
+		}
+	}
+	return ""
 }
 
 func (c *controlConn) Close() error {
@@ -172,10 +244,13 @@ func (c *controlConn) Close() error {
 		close(c.done)
 		c.mu.Unlock()
 
-		// Stop reliability features
 		if c.heartbeat != nil {
 			c.heartbeat.Stop()
 		}
+		if c.ackTracker != nil {
+			c.ackTracker.Close()
+		}
+		c.metrics.RecordConnectionClosed()
 
 		if c.cancelRead != nil {
 			c.cancelRead()
@@ -189,7 +264,6 @@ func (c *controlConn) Close() error {
 		if c.conn != nil {
 			_ = c.conn.CloseWithError(0, "")
 		}
-		// Call OnClose callback if set
 		if c.OnClose != nil {
 			c.OnClose()
 		}

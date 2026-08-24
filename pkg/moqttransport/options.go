@@ -36,6 +36,9 @@ type transportConfig struct {
 	quicConfig *quic.Config
 	// alpn is the ALPN protocol for TLS.
 	alpn []string
+
+	// metricsAddr is the Prometheus /metrics listen address (server only).
+	metricsAddr string
 }
 
 // Option is a function that configures the transport.
@@ -93,17 +96,27 @@ func WithTLSClientConfig(cfg *tls.Config) Option {
 	}
 }
 
+// WithMetricsAddr enables a Prometheus /metrics HTTP server on the given TCP address
+// (e.g. "127.0.0.1:9090"). Empty string disables it.
+func WithMetricsAddr(addr string) Option {
+	return func(c *transportConfig) error {
+		c.metricsAddr = addr
+		return nil
+	}
+}
+
 // WithConfig loads options from a config.Config object.
 func WithConfig(cfg *config.Config) Option {
 	return func(c *transportConfig) error {
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
-		
+
 		c.addr = cfg.Addr
 		c.alpn = cfg.ALPN
 		c.quicConfig = &quic.Config{EnableDatagrams: cfg.EnableDatagrams}
-		
+		c.metricsAddr = cfg.MetricsAddr
+
 		return nil
 	}
 }
@@ -125,10 +138,10 @@ func applyOptions(role transportRole, opts []Option) (*transportConfig, error) {
 		role: role,
 		addr: "localhost:0",
 		quicConfig: &quic.Config{
-			EnableDatagrams:        true,
-			MaxIdleTimeout:         60 * time.Second,
-			HandshakeIdleTimeout:   30 * time.Second,
-			KeepAlivePeriod:        15 * time.Second,
+			EnableDatagrams:      true,
+			MaxIdleTimeout:       60 * time.Second,
+			HandshakeIdleTimeout: 30 * time.Second,
+			KeepAlivePeriod:      15 * time.Second,
 		},
 		alpn: defaultALPN(),
 	}

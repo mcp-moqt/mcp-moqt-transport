@@ -48,13 +48,15 @@ Usage:
 
 Commands:
   version   显示版本
-  server    启动带 tools/prompts/resources 的 MCP 服务
-  client    连接服务并演示 capabilities
-  doctor    本地环境自检（Go/模块/示例路径）
+  server    启动 MCP 服务（支持 -stdio 或 QUIC/MOQT）
+  client    连接 QUIC/MOQT 服务并演示 capabilities
+  doctor    本地环境自检 + capabilities 冒烟（in-memory）
   help      显示帮助
 
 Examples:
+  mcp-moqt server -stdio
   mcp-moqt server -addr 127.0.0.1:8080
+  mcp-moqt server -addr 127.0.0.1:8080 -multi -metrics 127.0.0.1:9090
   mcp-moqt client -addr 127.0.0.1:8080
   mcp-moqt doctor
 `)
@@ -62,22 +64,62 @@ Examples:
 
 func runServer(args []string) {
 	fs := flag.NewFlagSet("server", flag.ExitOnError)
-	addr := fs.String("addr", "127.0.0.1:8080", "listen address")
+	addr := fs.String("addr", "127.0.0.1:8080", "QUIC listen address (ignored with -stdio)")
+	stdio := fs.Bool("stdio", false, "serve over stdin/stdout (for Cursor / MCP hosts)")
+	metrics := fs.String("metrics", "", "Prometheus /metrics listen address (e.g. 127.0.0.1:9090)")
+	multi := fs.Bool("multi", false, "accept multiple QUIC clients (Serve loop)")
 	_ = fs.Parse(args)
 
 	ctx := context.Background()
-	transport, err := mcpmoqt.NewMoqTransport(mcpmoqt.RoleServer, mcpmoqt.WithAddr(*addr))
-	if err != nil {
-		fatalf("new transport: %v", err)
-	}
-
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    mcpservice.ServiceName,
 		Version: mcpservice.ServiceVersion,
 	}, nil)
 	mcpservice.RegisterCapabilities(server)
 
-	fmt.Printf("listening on %s (tools/prompts/resources enabled)\n", *addr)
+	if *stdio {
+		fmt.Fprintf(os.Stderr, "mcp-moqt server (stdio) ready; tools/prompts/resources enabled\n")
+		if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil {
+			fatalf("server run: %v", err)
+		}
+		return
+	}
+
+	opts := []mcpmoqt.Option{mcpmoqt.WithAddr(*addr)}
+	if *metrics != "" {
+		opts = append(opts, mcpmoqt.WithMetricsAddr(*metrics))
+	}
+
+	if *multi {
+		raw, err := mcpmoqt.NewMOQTServerTransport(opts...)
+		if err != nil {
+			fatalf("new transport: %v", err)
+		}
+		fmt.Printf("listening on %s (multi-accept; metrics=%q)\n", *addr, *metrics)
+		if err := raw.Serve(ctx, func(ctx context.Context, conn mcpmoqt.Connection) error {
+			s := mcp.NewServer(&mcp.Implementation{
+				Name:    mcpservice.ServiceName,
+				Version: mcpservice.ServiceVersion,
+			}, nil)
+			mcpservice.RegisterCapabilities(s)
+			ss, err := s.Connect(ctx, &mcpmoqt.PreconnectedTransport{Conn: conn}, nil)
+			if err != nil {
+				return err
+			}
+			defer ss.Close()
+			return ss.Wait()
+		}); err != nil {
+			fatalf("serve: %v", err)
+		}
+		return
+	}
+
+	transport, err := mcpmoqt.NewMoqTransport(mcpmoqt.RoleServer, opts...)
+	if err != nil {
+		fatalf("new transport: %v", err)
+	}
+
+	fmt.Printf("listening on %s (QUIC/MOQT; tools/prompts/resources enabled; metrics=%q)\n", *addr, *metrics)
 	if err := server.Run(ctx, transport); err != nil {
 		fatalf("server run: %v", err)
 	}
@@ -111,34 +153,13 @@ func runClient(args []string) {
 		fatalf("ping: %v", err)
 	}
 	fmt.Println("ping: ok")
-
-	if tools, err := session.ListTools(ctx, nil); err == nil {
-		names := make([]string, 0, len(tools.Tools))
-		for _, t := range tools.Tools {
-			names = append(names, t.Name)
-		}
-		fmt.Printf("tools (%d): %s\n", len(names), strings.Join(names, ", "))
-	}
-
-	if prompts, err := session.ListPrompts(ctx, nil); err == nil {
-		names := make([]string, 0, len(prompts.Prompts))
-		for _, p := range prompts.Prompts {
-			names = append(names, p.Name)
-		}
-		fmt.Printf("prompts (%d): %s\n", len(names), strings.Join(names, ", "))
-	}
-
-	if resources, err := session.ListResources(ctx, nil); err == nil {
-		uris := make([]string, 0, len(resources.Resources))
-		for _, r := range resources.Resources {
-			uris = append(uris, r.URI)
-		}
-		fmt.Printf("resources (%d): %s\n", len(uris), strings.Join(uris, ", "))
-	}
+	printCapabilities(ctx, session)
 }
 
 func runDoctor(args []string) {
-	_ = flag.NewFlagSet("doctor", flag.ExitOnError).Parse(args)
+	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+	skipCaps := fs.Bool("skip-capabilities", false, "skip in-memory tools/prompts/resources smoke test")
+	_ = fs.Parse(args)
 
 	checks := []struct {
 		name string
@@ -148,8 +169,10 @@ func runDoctor(args []string) {
 		{"go toolchain", commandExists("go"), "https://go.dev/dl/"},
 		{"service package", true, "pkg/mcpservice (tools/prompts/resources)"},
 		{"CLI entrypoint", true, "cmd/mcp-moqt"},
+		{"stdio mode", true, "mcp-moqt server -stdio"},
 		{"install scripts", true, "scripts/install.sh + scripts/install.ps1"},
 		{"docker compose", true, "docker compose up --build"},
+		{"mcp config samples", true, "configs/mcp/*.json"},
 	}
 
 	fmt.Printf("doctor: %s %s\n", mcpservice.ServiceName, mcpservice.ServiceVersion)
@@ -162,10 +185,94 @@ func runDoctor(args []string) {
 		}
 		fmt.Printf("  [%s] %s — %s\n", status, c.name, c.hint)
 	}
+
+	if !*skipCaps {
+		if err := smokeCapabilities(); err != nil {
+			fmt.Printf("  [fail] capabilities smoke — %v\n", err)
+			allOK = false
+		} else {
+			fmt.Printf("  [ok] capabilities smoke — tools/prompts/resources list+call/read\n")
+		}
+	}
+
 	if !allOK {
 		os.Exit(1)
 	}
 	fmt.Println("environment looks ready")
+}
+
+func smokeCapabilities() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    mcpservice.ServiceName,
+		Version: mcpservice.ServiceVersion,
+	}, nil)
+	mcpservice.RegisterCapabilities(server)
+
+	t1, t2 := mcp.NewInMemoryTransports()
+	if _, err := server.Connect(ctx, t1, nil); err != nil {
+		return fmt.Errorf("server connect: %w", err)
+	}
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "doctor", Version: mcpservice.ServiceVersion}, nil)
+	session, err := client.Connect(ctx, t2, nil)
+	if err != nil {
+		return fmt.Errorf("client connect: %w", err)
+	}
+	defer session.Close()
+
+	tools, err := session.ListTools(ctx, nil)
+	if err != nil || len(tools.Tools) < 1 {
+		return fmt.Errorf("list tools: %v (count=%d)", err, lenOrZeroTools(tools))
+	}
+	prompts, err := session.ListPrompts(ctx, nil)
+	if err != nil || len(prompts.Prompts) < 1 {
+		return fmt.Errorf("list prompts failed")
+	}
+	resources, err := session.ListResources(ctx, nil)
+	if err != nil || len(resources.Resources) < 1 {
+		return fmt.Errorf("list resources failed")
+	}
+	if _, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "health_check"}); err != nil {
+		return fmt.Errorf("health_check: %w", err)
+	}
+	if _, err := session.ReadResource(ctx, &mcp.ReadResourceParams{URI: "moqt://docs/overview"}); err != nil {
+		return fmt.Errorf("read resource: %w", err)
+	}
+	return nil
+}
+
+func lenOrZeroTools(r *mcp.ListToolsResult) int {
+	if r == nil {
+		return 0
+	}
+	return len(r.Tools)
+}
+
+func printCapabilities(ctx context.Context, session *mcp.ClientSession) {
+	if tools, err := session.ListTools(ctx, nil); err == nil {
+		names := make([]string, 0, len(tools.Tools))
+		for _, t := range tools.Tools {
+			names = append(names, t.Name)
+		}
+		fmt.Printf("tools (%d): %s\n", len(names), strings.Join(names, ", "))
+	}
+	if prompts, err := session.ListPrompts(ctx, nil); err == nil {
+		names := make([]string, 0, len(prompts.Prompts))
+		for _, p := range prompts.Prompts {
+			names = append(names, p.Name)
+		}
+		fmt.Printf("prompts (%d): %s\n", len(names), strings.Join(names, ", "))
+	}
+	if resources, err := session.ListResources(ctx, nil); err == nil {
+		uris := make([]string, 0, len(resources.Resources))
+		for _, r := range resources.Resources {
+			uris = append(uris, r.URI)
+		}
+		fmt.Printf("resources (%d): %s\n", len(uris), strings.Join(uris, ", "))
+	}
 }
 
 func commandExists(name string) bool {

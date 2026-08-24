@@ -9,12 +9,13 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/mcp-moqt/mcp-moqt-transport/pkg/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const (
-	ServiceName    = "mcp-moqt-transport"
-	ServiceVersion = "1.3.0"
+	ServiceName    = version.Name
+	ServiceVersion = version.Version
 )
 
 // RegisterCapabilities adds tools, prompts, and resources required for a

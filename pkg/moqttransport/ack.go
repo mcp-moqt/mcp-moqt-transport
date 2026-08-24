@@ -37,10 +37,10 @@ type AckMessage struct {
 }
 
 type AckTracker struct {
-	mu       sync.RWMutex
-	pending  map[string]*pendingAck
-	timeout  time.Duration
-	closed   atomic.Bool
+	mu      sync.RWMutex
+	pending map[string]*pendingAck
+	timeout time.Duration
+	closed  atomic.Bool
 }
 
 type pendingAck struct {

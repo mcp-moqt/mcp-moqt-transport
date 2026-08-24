@@ -6,6 +6,10 @@ REPO="${MCP_MOQT_REPO:-github.com/mcp-moqt/mcp-moqt-transport}"
 BIN_DIR="${MCP_MOQT_BIN:-${HOME}/.local/bin}"
 VERSION="${MCP_MOQT_VERSION:-latest}"
 
+# If run from a local checkout, prefer building that tree.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 echo "==> MCP over MOQT friendly installer"
 echo "    module : ${REPO}"
 echo "    version: ${VERSION}"
@@ -19,9 +23,14 @@ fi
 mkdir -p "${BIN_DIR}"
 
 echo "==> Installing CLI (mcp-moqt)"
-GOBIN="${BIN_DIR}" go install "${REPO}/cmd/mcp-moqt@${VERSION}"
+if [[ -f "${REPO_ROOT}/go.mod" ]] && grep -q "module github.com/mcp-moqt/mcp-moqt-transport" "${REPO_ROOT}/go.mod" 2>/dev/null; then
+  echo "    mode   : local checkout (${REPO_ROOT})"
+  (cd "${REPO_ROOT}" && GOBIN="${BIN_DIR}" go install ./cmd/mcp-moqt)
+else
+  echo "    mode   : remote go install"
+  GOBIN="${BIN_DIR}" go install "${REPO}/cmd/mcp-moqt@${VERSION}"
+fi
 
-# Ensure PATH hint
 case ":${PATH}:" in
   *":${BIN_DIR}:"*) ;;
   *)
@@ -38,11 +47,18 @@ cat <<EOF
 
 Install complete.
 
-Quick start:
+Quick start (stdio for Cursor / MCP hosts):
+  mcp-moqt server -stdio
+
+Quick start (QUIC/MOQT):
   mcp-moqt server -addr 127.0.0.1:8080
   mcp-moqt client -addr 127.0.0.1:8080
 
-Docker alternative:
+Config samples:
+  configs/mcp/cursor.mcp.json
+  configs/mcp/claude_desktop.json
+
+Docker:
   docker compose up --build
 
 EOF

@@ -5,9 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## v1.4.0 更新概述
 
-## [v1.3.0] - 2026-08-24
+### Added
+
+- 服务端多连接：`Listen` + `Accept` 循环；`Serve` / `PreconnectedTransport` 支持并发客户端
+- Prometheus 文本格式 `/metrics` HTTP 服务（`WithMetricsAddr` / `MetricsHTTPServer`）
+- 配置文件热加载（`config.WatchFile` 轮询）
+
+### Changed
+
+- Roadmap 标记多连接、`/metrics`、配置热加载为已完成
+- 统一 `gofmt` 代码风格
+- Go 工具链最低版本提升至 **1.25.13**（CI / Docker / `go.mod`）
+
+## v1.3.0 更新概述
 
 ### Added
 
@@ -15,18 +27,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tools: `health_check`, `get_transport_info`, `list_data_tracks`, `estimate_rtt`
   - Prompts: `debug_moqt_session`, `configure_transport`
   - Resources: `moqt://docs/overview`, `moqt://config/example`, `moqt://tracks/catalog`, `moqt://install/quickstart`
-- Friendly install methods: `scripts/install.sh`, `scripts/install.ps1`, `Makefile`
-- CLI utility: `cmd/mcp-moqt` (`server` / `client` / `doctor` / `version`)
-- Unit tests for capability registration (`test/unit/mcpservice`)
+- Friendly install methods: `scripts/install.sh`, `scripts/install.ps1`, `Makefile`（支持本地 checkout 安装）
+- CLI utility: `cmd/mcp-moqt`（`server` / `client` / `doctor` / `version`）
+  - **stdio 模式**：`mcp-moqt server -stdio`
+  - doctor 增加 tools/prompts/resources 冒烟检查
+- MCP host 配置样例：`configs/mcp/*.json`
+- 文档：`docs/getting-started.md`、`docs/capabilities.md`、`docs/security.md`
+- 控制连接可靠性接线：ACK 跟踪、心跳 keepalive notification、Write 重试计数、连接级 Metrics
+- 客户端连接池：`WithQUICConfig` 覆盖池参数；会话结束 `Put` 归还连接
+- 服务端 composite subscribe（控制轨 + 数据轨）；`SubscribeDataTrack` / `AttachSessionSubscribe`
+- 数据轨道 e2e 集成测试；CI Go 1.25、coverage soft gate、`govulncheck`、Release 工作流
 
 ### Changed
 
-- Example server now registers tools/prompts/resources by default
-- Example client exercises list/call/read against those capabilities
-- Dockerfiles updated to Go 1.25 and bind server to `0.0.0.0:8080`
+- Example server 支持 `-stdio`
+- Example client 演示 list/call/read capabilities
+- Dockerfiles 更新到 Go 1.25
 
-## [v1.2.0] - 2026-04-27
-
+## v1.2.0 更新概述
 
 ### Changed
 
@@ -36,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Code quality optimization: passed go vet code quality check
 - Updated version numbers in all example files and documentation
 
-## [v1.1.1] - 2026-04-27
+## v1.1.1 更新概述
 
 ### Changed
 
@@ -45,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - github.com/quic-go/quic-go: v0.53.0 → v0.59.0
 - Improved protocol compatibility and stability
 
-## [v1.1.0] - 2026-04-27
+## v1.1.0 更新概述
 
 ### Added
 
@@ -71,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Race condition issue in monitoring metrics under multi-threaded environment
 - Type conversion error in configuration file parsing
 
-## [v1.0.0] - 2026-04-27
+## v1.0.0 更新概述
 
 ### Added
 
@@ -94,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - InitialMaxRequestID default value issue in discovery mechanism
 - Integration test timeout issue
 
-## [v0.7.1] - 2026-04-27
+## v0.7.1 更新概述
 
 ### Fixed
 
@@ -107,7 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated version number in discovery response from 0.4.0 to 0.7.0
 
-## [v0.7.0] - 2026-04-27
+## v0.7.0 更新概述
 
 ### Added
 
@@ -116,7 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - QUIC configuration builder with fluent interface
 - Unit tests for QUIC connection pool, stream manager, and configuration builder
 
-## [v0.6.0] - 2026-04-27
+## v0.6.0 更新概述
 
 ### Changed
 
@@ -137,7 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unit tests for message acknowledgment, heartbeat detection, retry mechanism, monitoring metrics, and data track handler
 
-## [v0.5.0] - 2026-04-27
+## v0.5.0 更新概述
 
 ### Added
 
@@ -148,7 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Monitoring metrics for message statistics, throughput, error rates, etc.
 - Feature example code
 
-## [v0.4.0] - 2026-04-27
+## v0.4.0 更新概述
 
 ### Added
 
@@ -160,7 +178,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data track related error types
 - Updated documentation with data track usage instructions
 
-## [v0.3.0] - 2026-04-27
+## v0.3.0 更新概述
 
 ### Changed
 
@@ -185,7 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD automation integration
 - Example configuration files and environment variable templates
 
-## [v0.2.0] - 2026-04-27
+## v0.2.0 更新概述
 
 ### Changed
 
@@ -209,16 +227,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance benchmark support
 - CI/CD automation integration
 - Example configuration files and environment variable templates
-
-[Unreleased]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v1.2.0...HEAD
-[v1.2.0]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v1.1.1...v1.2.0
-[v1.1.1]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v1.1.0...v1.1.1
-[v1.1.0]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v1.0.0...v1.1.0
-[v1.0.0]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v0.7.1...v1.0.0
-[v0.7.1]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v0.7.0...v0.7.1
-[v0.7.0]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v0.6.0...v0.7.0
-[v0.6.0]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v0.5.0...v0.6.0
-[v0.5.0]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v0.4.0...v0.5.0
-[v0.4.0]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v0.3.0...v0.4.0
-[v0.3.0]: https://github.com/mcp-moqt/mcp-moqt-transport/compare/v0.2.0...v0.3.0
-[v0.2.0]: https://github.com/mcp-moqt/mcp-moqt-transport/releases/tag/v0.2.0

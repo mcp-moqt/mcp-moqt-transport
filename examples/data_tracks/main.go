@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/mcp-moqt/mcp-moqt-transport/pkg/mcpservice"
 	mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -56,7 +57,7 @@ func main() {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "data-track-example-server",
-		Version: "1.2.0",
+		Version: mcpservice.ServiceVersion,
 	}, nil)
 
 	resourceMsg := &mcpmoqt.DataTrackMessage{

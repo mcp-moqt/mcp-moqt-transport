@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mcp-moqt-transport": {
+      "command": "mcp-moqt",
+      "args": ["server", "-stdio"],
+      "description": "MCP over MOQT transport demo with tools, prompts, and resources"
+    }
+  }
+}

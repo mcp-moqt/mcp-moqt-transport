@@ -150,8 +150,8 @@ if err != nil {
 }
 
 server := mcp.NewServer(&mcp.Implementation{
-		Name:    "example-server",
-		Version: "1.2.0",
+		Name:    mcpservice.ServiceName,
+		Version: mcpservice.ServiceVersion,
 	}, nil)
 
 if err := server.Run(ctx, transport); err != nil {
@@ -171,7 +171,7 @@ if err != nil {
 
 client := mcp.NewClient(&mcp.Implementation{
 		Name:    "example-client",
-		Version: "1.2.0",
+		Version: mcpservice.ServiceVersion,
 	}, nil)
 	session, err := client.Connect(ctx, transport, nil)
 if err != nil {
@@ -186,7 +186,7 @@ if err := session.Ping(ctx, nil); err != nil {
 
 ## Reliability Features
 
-Reliability features (ack/heartbeat/retry/metrics) are now implemented in 1.1.0.
+Reliability features (ack/heartbeat/retry/metrics) are wired into the control connection in v1.3.0.
 
 ### Acknowledgment Tracker
 
@@ -369,3 +369,14 @@ mcpservice.RegisterCapabilities(server)
 | `moqt://config/example` | application/yaml |
 | `moqt://tracks/catalog` | application/json |
 | `moqt://install/quickstart` | text/markdown |
+
+### Transports
+
+- stdio: `mcp-moqt server -stdio` (see `configs/mcp/`)
+- QUIC/MOQT: `NewMoqTransport(RoleServer|RoleClient, WithAddr(...))`
+
+### Data tracks (P2)
+
+- Server: composite subscribe routes control + `resources`/`tools`/`notifications`
+- Client: `(*MOQTClientTransport).SubscribeDataTrack`
+- APIs: `Publish`, `PublishStream`, `BatchPublish`, `StreamMessages`, `AttachSessionSubscribe`

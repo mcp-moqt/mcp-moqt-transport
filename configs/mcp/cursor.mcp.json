@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mcp-moqt-transport": {
+      "command": "mcp-moqt",
+      "args": ["server", "-stdio"],
+      "env": {}
+    }
+  }
+}

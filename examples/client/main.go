@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 
+	"github.com/mcp-moqt/mcp-moqt-transport/pkg/mcpservice"
 	mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -25,7 +26,7 @@ func main() {
 
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    "example-client",
-		Version: "1.3.0",
+		Version: mcpservice.ServiceVersion,
 	}, nil)
 
 	session, err := client.Connect(ctx, transport, nil)

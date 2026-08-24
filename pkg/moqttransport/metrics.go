@@ -7,21 +7,21 @@ import (
 )
 
 type Metrics struct {
-	messagesSent     atomic.Int64
-	messagesReceived atomic.Int64
-	messagesAcked    atomic.Int64
-	messagesNacked   atomic.Int64
-	messagesTimeout  atomic.Int64
-	bytesSent        atomic.Int64
-	bytesReceived    atomic.Int64
-	errors           atomic.Int64
-	retries          atomic.Int64
-	heartbeatsSent   atomic.Int64
-	heartbeatsFailed atomic.Int64
-	connectionsTotal atomic.Int64
+	messagesSent      atomic.Int64
+	messagesReceived  atomic.Int64
+	messagesAcked     atomic.Int64
+	messagesNacked    atomic.Int64
+	messagesTimeout   atomic.Int64
+	bytesSent         atomic.Int64
+	bytesReceived     atomic.Int64
+	errors            atomic.Int64
+	retries           atomic.Int64
+	heartbeatsSent    atomic.Int64
+	heartbeatsFailed  atomic.Int64
+	connectionsTotal  atomic.Int64
 	connectionsActive atomic.Int64
-	tracksTotal      atomic.Int64
-	tracksActive     atomic.Int64
+	tracksTotal       atomic.Int64
+	tracksActive      atomic.Int64
 
 	startTime time.Time
 }
@@ -151,26 +151,26 @@ func (m *Metrics) Uptime() time.Duration {
 }
 
 type MetricsSnapshot struct {
-	MessagesSent     int64         `json:"messages_sent"`
-	MessagesReceived int64         `json:"messages_received"`
-	MessagesAcked    int64         `json:"messages_acked"`
-	MessagesNacked   int64         `json:"messages_nacked"`
-	MessagesTimeout  int64         `json:"messages_timeout"`
-	BytesSent        int64         `json:"bytes_sent"`
-	BytesReceived    int64         `json:"bytes_received"`
-	Errors           int64         `json:"errors"`
-	Retries          int64         `json:"retries"`
-	HeartbeatsSent   int64         `json:"heartbeats_sent"`
-	HeartbeatsFailed int64         `json:"heartbeats_failed"`
-	ConnectionsTotal int64         `json:"connections_total"`
-	ConnectionsActive int64        `json:"connections_active"`
-	TracksTotal      int64         `json:"tracks_total"`
-	TracksActive     int64         `json:"tracks_active"`
-	Uptime           time.Duration `json:"uptime"`
-	AckRate          float64       `json:"ack_rate"`
-	ErrorRate        float64       `json:"error_rate"`
-	ThroughputIn     float64       `json:"throughput_in_bytes_per_sec"`
-	ThroughputOut    float64       `json:"throughput_out_bytes_per_sec"`
+	MessagesSent      int64         `json:"messages_sent"`
+	MessagesReceived  int64         `json:"messages_received"`
+	MessagesAcked     int64         `json:"messages_acked"`
+	MessagesNacked    int64         `json:"messages_nacked"`
+	MessagesTimeout   int64         `json:"messages_timeout"`
+	BytesSent         int64         `json:"bytes_sent"`
+	BytesReceived     int64         `json:"bytes_received"`
+	Errors            int64         `json:"errors"`
+	Retries           int64         `json:"retries"`
+	HeartbeatsSent    int64         `json:"heartbeats_sent"`
+	HeartbeatsFailed  int64         `json:"heartbeats_failed"`
+	ConnectionsTotal  int64         `json:"connections_total"`
+	ConnectionsActive int64         `json:"connections_active"`
+	TracksTotal       int64         `json:"tracks_total"`
+	TracksActive      int64         `json:"tracks_active"`
+	Uptime            time.Duration `json:"uptime"`
+	AckRate           float64       `json:"ack_rate"`
+	ErrorRate         float64       `json:"error_rate"`
+	ThroughputIn      float64       `json:"throughput_in_bytes_per_sec"`
+	ThroughputOut     float64       `json:"throughput_out_bytes_per_sec"`
 }
 
 func (m *Metrics) Snapshot() MetricsSnapshot {
