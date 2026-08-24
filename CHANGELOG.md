@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.0] - 2026-08-24
+
+### Added
+
+- MCP service capabilities for marketplace completeness:
+  - Tools: `health_check`, `get_transport_info`, `list_data_tracks`, `estimate_rtt`
+  - Prompts: `debug_moqt_session`, `configure_transport`
+  - Resources: `moqt://docs/overview`, `moqt://config/example`, `moqt://tracks/catalog`, `moqt://install/quickstart`
+- Friendly install methods: `scripts/install.sh`, `scripts/install.ps1`, `Makefile`
+- CLI utility: `cmd/mcp-moqt` (`server` / `client` / `doctor` / `version`)
+- Unit tests for capability registration (`test/unit/mcpservice`)
+
+### Changed
+
+- Example server now registers tools/prompts/resources by default
+- Example client exercises list/call/read against those capabilities
+- Dockerfiles updated to Go 1.25 and bind server to `0.0.0.0:8080`
+
 ## [v1.2.0] - 2026-04-27
+
 
 ### Changed
 

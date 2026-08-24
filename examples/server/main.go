@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 
+	"github.com/mcp-moqt/mcp-moqt-transport/pkg/mcpservice"
 	mcpmoqt "github.com/mcp-moqt/mcp-moqt-transport/pkg/moqttransport"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -24,9 +25,15 @@ func main() {
 	}
 
 	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "example-server",
-		Version: "1.2.0",
+		Name:    mcpservice.ServiceName,
+		Version: mcpservice.ServiceVersion,
 	}, nil)
+
+	// Register tools / prompts / resources for marketplace completeness.
+	mcpservice.RegisterCapabilities(server)
+
+	log.Printf("MCP over MOQT server listening on %s", *addr)
+	log.Printf("capabilities: tools, prompts, resources")
 
 	if err := server.Run(ctx, transport); err != nil {
 		log.Fatalf("server run: %v", err)

@@ -330,3 +330,42 @@ const (
     DataTrackNotifications DataTrackType = "notifications"
 )
 ```
+
+## MCP Service Capabilities (`pkg/mcpservice`)
+
+`RegisterCapabilities` wires practical MCP Tools, Prompts, and Resources onto an `mcp.Server`:
+
+```go
+import "github.com/mcp-moqt/mcp-moqt-transport/pkg/mcpservice"
+
+server := mcp.NewServer(&mcp.Implementation{
+    Name:    mcpservice.ServiceName,
+    Version: mcpservice.ServiceVersion,
+}, nil)
+mcpservice.RegisterCapabilities(server)
+```
+
+### Tools
+
+| Name | Description |
+|------|-------------|
+| `health_check` | Runtime/health snapshot |
+| `get_transport_info` | ALPN, draft, feature list |
+| `list_data_tracks` | Available MOQT data tracks |
+| `estimate_rtt` | Simple RTT estimate from samples |
+
+### Prompts
+
+| Name | Arguments |
+|------|-----------|
+| `debug_moqt_session` | `symptom` (required), `addr` (optional) |
+| `configure_transport` | `environment` (required), `goal` (optional) |
+
+### Resources
+
+| URI | MIME |
+|-----|------|
+| `moqt://docs/overview` | text/markdown |
+| `moqt://config/example` | application/yaml |
+| `moqt://tracks/catalog` | application/json |
+| `moqt://install/quickstart` | text/markdown |

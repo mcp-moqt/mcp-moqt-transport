@@ -15,6 +15,9 @@ MCP over MOQT Transport 是一个高性能、可靠的传输层实现，专为 M
 - **高性能传输**：基于 QUIC 协议，支持多路复用、0-RTT 连接和拥塞控制
 - **可靠性保证**：实现了消息确认机制、心跳检测和重试机制
 - **数据轨道支持**：支持资源（resources）、工具（tools）、通知（notifications）数据轨道
+- **MCP 能力完备**：内置实用 Tools、Prompts、Resources，满足平台能力清单
+- **友好安装**：一键脚本、`go install`、Make、Docker Compose 多种安装方式
+- **实用 CLI**：`mcp-moqt` 提供 server/client/doctor 等工具命令
 - **连接池管理**：内置 QUIC 连接池，优化连接复用和资源使用
 - **灵活配置**：支持配置文件、环境变量和命令行参数
 - **完善的监控**：提供详细的监控指标，支持 Prometheus 集成
@@ -56,7 +59,18 @@ v1.2.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex�
 
 ## 版本
 
-当前版本：v1.2.0
+当前版本：v1.3.0
+
+## v1.3.0 更新概述
+
+- **MCP 能力补齐（对应平台评分项）**：
+  - 实用工具（Tools）：`health_check` / `get_transport_info` / `list_data_tracks` / `estimate_rtt`
+  - 提示词（Prompts）：`debug_moqt_session` / `configure_transport`
+  - 资源（Resources）：`moqt://docs/overview` 等 4 个可读取资源
+- **友好安装方式**：
+  - 一键脚本：`scripts/install.sh`（Linux/macOS）、`scripts/install.ps1`（Windows）
+  - `go install` / `make install` / Docker Compose
+- **实用 CLI**：`cmd/mcp-moqt`，支持 `server` / `client` / `doctor` / `version`
 
 ## v1.2.0 更新概述
 
@@ -272,37 +286,94 @@ v1.2.0 的实现与文档更新仍借助 AI 辅助编写（OpenAI GPT-5，Codex�
 - 🔜 将可靠性功能集成到核心传输层。
 - 🔜 将 QUIC 连接池集成到客户端和服务器。
 
-## 快速上手
+## 快速上手（多种友好安装方式）
 
-1. `go get github.com/mcp-moqt/mcp-moqt-transport`
-2. `go run ./examples/server -addr 127.0.0.1:8080`
-3. `go run ./examples/client -addr 127.0.0.1:8080`
+### 方式 1：一键安装脚本（推荐）
 
-## 演示与预期结果
+Linux / macOS：
 
-在两个终端分别运行示例：
+```bash
+curl -fsSL https://raw.githubusercontent.com/mcp-moqt/mcp-moqt-transport/main/scripts/install.sh | bash
+```
 
-终端 A（server）：
+Windows PowerShell：
+
+```powershell
+irm https://raw.githubusercontent.com/mcp-moqt/mcp-moqt-transport/main/scripts/install.ps1 | iex
+```
+
+本地仓库安装：
+
+```bash
+# Linux/macOS
+bash scripts/install.sh
+
+# Windows
+powershell -File scripts/install.ps1
+```
+
+### 方式 2：go install
+
+```bash
+go install github.com/mcp-moqt/mcp-moqt-transport/cmd/mcp-moqt@latest
+mcp-moqt doctor
+mcp-moqt server -addr 127.0.0.1:8080
+```
+
+### 方式 3：Make
+
+```bash
+make install   # 或 make build
+make server    # 启动带 tools/prompts/resources 的服务
+make client    # 连接并演示 capabilities
+```
+
+### 方式 4：Docker Compose
+
+```bash
+docker compose up --build
+```
+
+### 方式 5：直接运行示例
 
 ```bash
 go run ./examples/server -addr 127.0.0.1:8080
-```
-
-终端 B（client）：
-
-```bash
 go run ./examples/client -addr 127.0.0.1:8080
 ```
-
-预期输出：
-
-- client 输出 `connected to 127.0.0.1:8080; ping ok`
-- server 在 client 断开后返回 `context canceled`，这是单连接示例的正常行为
 
 ## 安装
 
 ```bash
 go get github.com/mcp-moqt/mcp-moqt-transport
+# 或安装 CLI
+go install github.com/mcp-moqt/mcp-moqt-transport/cmd/mcp-moqt@latest
+```
+
+## MCP 服务能力（Tools / Prompts / Resources）
+
+示例服务与 `mcp-moqt server` 默认注册以下能力，满足平台对「实用工具 / 提示词 / 资源」的要求：
+
+| 类型 | 名称 | 说明 |
+|------|------|------|
+| Tool | `health_check` | 健康检查与运行时信息 |
+| Tool | `get_transport_info` | 传输层能力与草案信息 |
+| Tool | `list_data_tracks` | 列出数据轨道 |
+| Tool | `estimate_rtt` | 简易 RTT 估算演示 |
+| Prompt | `debug_moqt_session` | 会话排查提示词 |
+| Prompt | `configure_transport` | 配置助手提示词 |
+| Resource | `moqt://docs/overview` | 服务概述 |
+| Resource | `moqt://config/example` | 示例 YAML 配置 |
+| Resource | `moqt://tracks/catalog` | 数据轨道目录 |
+| Resource | `moqt://install/quickstart` | 友好安装说明 |
+
+在代码中注册：
+
+```go
+server := mcp.NewServer(&mcp.Implementation{
+    Name:    "mcp-moqt-transport",
+    Version: "1.3.0",
+}, nil)
+mcpservice.RegisterCapabilities(server)
 ```
 
 ## 使用示例
@@ -689,61 +760,40 @@ mcp-moqt-transport/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml              # GitHub Actions CI 配置
+├── cmd/
+│   └── mcp-moqt/              # 友好 CLI（server/client/doctor）
 ├── pkg/
 │   ├── config/                # 配置管理（支持 YAML/JSON/环境变量）
 │   ├── logger/                # 日志记录
+│   ├── mcpservice/            # Tools / Prompts / Resources 能力注册
 │   └── moqttransport/         # 核心实现
-│       ├── ack.go               # 消息确认机制
-│       ├── client.go            # 客户端连接/会话封装
-│       ├── control_conn.go      # 控制轨道的 JSON-RPC 读写
-│       ├── data_tracks.go       # 数据轨道定义
-│       ├── data_track_handler.go # 数据轨道处理器
-│       ├── errors.go            # 错误类型定义
-│       ├── heartbeat.go         # 心跳检测机制
-│       ├── metrics.go           # 监控指标
-│       ├── new_transport.go     # 统一构造函数
-│       ├── options.go           # 可配置选项（addr/TLS/ALPN/QUIC）
-│       ├── quic_manager.go      # QUIC 连接池和流管理
-│       ├── quic_moq.go          # QUIC <-> moqtransport 适配
-│       ├── retry.go             # 重试机制
-│       ├── server.go            # 服务端连接/会话封装
-│       ├── session_handlers.go  # discovery / subscribe handler
-│       ├── session_id.go        # MCP Session ID 生成
-│       ├── tls.go               # TLS 默认行为与封装
-│       ├── track_base.go        # Track 基础设施
-│       └── transport.go         # MCP over MOQT 的 Transport/Connection 实现
+├── scripts/
+│   ├── install.sh             # Linux/macOS 一键安装
+│   └── install.ps1            # Windows 一键安装
 ├── test/
 │   ├── benchmark/             # 性能基准测试
-│   │   └── benchmark_test.go
 │   ├── integration/           # 集成测试
-│   │   └── connectivity_test.go # 端到端 Run + Ping 测试
 │   └── unit/                  # 单元测试
-│       ├── config/              # 配置管理测试
-│       ├── configfile/          # 配置文件测试
-│       ├── logger/              # 日志记录测试
-│       └── mcpmoqt/             # 核心功能测试
-│           ├── errors_test.go
-│           ├── moqttransport_test.go
-│           └── options_test.go
+│       ├── config/
+│       ├── configfile/
+│       ├── logger/
+│       ├── mcpservice/          # 能力注册测试
+│       └── mcpmoqt/
 ├── docs/
-│   ├── api.md                # API 文档
-│   └── design.md             # 设计文档
+│   ├── api.md
+│   └── design.md
 ├── examples/                  # 示例：server/client/data_tracks/features
-│   ├── client/
-│   ├── server/
-│   ├── data_tracks/
-│   └── features/              # 可靠性功能示例
-├── config.example.yaml       # YAML 配置示例
-├── config.example.json       # JSON 配置示例
-├── .env.example              # 环境变量示例
-├── Dockerfile.client         # 客户端 Dockerfile
-├── Dockerfile.server         # 服务端 Dockerfile
-├── docker-compose.yml        # Docker Compose 配置
-├── .gitignore                # Git 忽略文件
-├── LICENSE                   # 许可证
-├── go.mod                    # Go 模块依赖
-├── go.sum                    # Go 依赖校验和
-└── README.md                 # 项目说明
+├── Makefile                   # 友好构建/安装/运行入口
+├── Dockerfile.client
+├── Dockerfile.server
+├── docker-compose.yml
+├── config.example.yaml
+├── config.example.json
+├── .env.example
+├── LICENSE
+├── go.mod
+├── go.sum
+└── README.md
 ```
 
 ## 文档
@@ -769,6 +819,8 @@ mcp-moqt-transport/
 - [x] 添加性能基准测试支持
 - [x] 添加 CI/CD 自动化集成
 - [x] 实现数据轨道（resources/tools/notifications）
+- [x] 注册 MCP Tools / Prompts / Resources（平台能力项）
+- [x] 友好安装脚本与 CLI（scripts + cmd/mcp-moqt）
 
 ## 贡献指南
 
